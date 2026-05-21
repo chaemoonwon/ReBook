@@ -410,3 +410,243 @@ AnswerType fromInput(String input)
 - `Main`에서 `question`과 `answerType`을 묶는 코드는 어디에 두는 것이 좋은가?
 - `OutputView`의 결과 출력 메서드는 `BuyDecisionResult` 하나만 받아도 충분한가?
 - 질문 목록은 `Main`에 둘 것인가, 별도 객체로 분리할 것인가?
+
+---
+
+# 1단계 4일차 - 클래스 생성 방향 및 생성자 설계
+
+## 1. 오늘 과제 목적
+
+1단계 4일차 과제에서는 실제 Java 클래스 파일을 생성하기 전에,
+각 객체가 어떤 생성자와 필드를 가져야 하는지 최종적으로 설계했다.
+
+이번 단계의 핵심은 전체 기능 구현이 아니라,
+`BookConditionResponse`, `BuyDecisionResult`, `AnswerType`, `QuestionProvider`, `Main`의 역할과 생성 방향을 명확히 정리하는 것이다.
+
+---
+
+## 2. BookConditionResponse 생성자 설계
+
+### 역할
+
+`BookConditionResponse`는 질문 1개와 그 질문에 대한 답변 1개를 연결하는 객체다.
+
+### 생성자 방향
+
+```java
+BookConditionResponse(String question, AnswerType answerType)
+```
+
+### 받을 값
+
+- `question`
+- `answerType`
+
+### 이유
+
+- `BookConditionResponse` 하나는 질문 1개와 답변 1개를 묶어야 한다.
+- 따라서 생성 시점에 `question`과 `answerType`을 함께 받는 것이 자연스럽다.
+- 사용자가 어떤 질문에 어떤 답변을 했는지 연결할 수 있어야 `BuyDecisionService`가 판단할 수 있다.
+
+---
+
+## 3. etcText 위치 설계
+
+### 결정
+
+`etcText`는 `AnswerType`이 아니라 `BookConditionResponse`에 둔다.
+
+### 이유
+
+- `AnswerType.OTHER`는 “기타를 선택했다”는 답변 종류만 의미한다.
+- 사용자가 입력한 기타 설명은 특정 질문에 대한 응답에 속한다.
+- 따라서 실제 기타 설명은 `BookConditionResponse`의 필드로 두는 것이 자연스럽다.
+
+### 추후 확장 방향
+
+```java
+BookConditionResponse(String question, AnswerType answerType, String etcText)
+```
+
+### 설계 기준
+
+- 현재 1차 MVP에서는 `question`, `answerType`만 사용한다.
+- `OTHER` 답변에 대한 구체적인 설명이 필요해지는 시점에 `etcText`를 추가한다.
+
+---
+
+## 4. BuyDecisionResult 생성 방식 설계
+
+### 역할
+
+`BuyDecisionResult`는 매입 가능 여부 판단 결과를 담는 객체다.
+
+### 필요한 값
+
+```java
+boolean buyable
+List<String> rejectReasons
+String message
+```
+
+### 생성자 방향
+
+```java
+BuyDecisionResult(boolean buyable, List<String> rejectReasons, String message)
+```
+
+### 이유
+
+- 판단 결과 객체는 생성된 뒤 값이 자주 바뀌기보다, 생성 시점에 필요한 값을 모두 받는 것이 안전하다.
+- `buyable`만 받으면 `rejectReasons`와 `message`를 어디에서 채울지 애매해질 수 있다.
+- `setter`로 값을 하나씩 변경하는 방식은 결과 객체의 일관성을 해칠 수 있다.
+
+### 설계 기준
+
+- 1차 MVP에서는 생성자에서 `buyable`, `rejectReasons`, `message`를 모두 받는 방향으로 설계한다.
+- 매입 가능 결과용 메서드와 매입 불가 결과용 메서드는 추후 리팩터링 후보로 둔다.
+
+---
+
+## 5. AnswerType.fromInput() 입력 처리 방향
+
+### 역할
+
+`AnswerType.fromInput(String input)`은 사용자 입력 문자열을 `AnswerType` enum 값으로 변환한다.
+
+### 변환 대상
+
+```text
+예     → YES
+아니오 → NO
+모름   → UNKNOWN
+기타   → OTHER
+```
+
+### 잘못된 입력 처리 방향
+
+잘못된 입력은 `UNKNOWN`으로 처리하지 않고, 다시 입력받도록 한다.
+
+### 이유
+
+- 잘못된 입력은 사용자의 실수일 수 있다.
+- 잘못된 입력을 `UNKNOWN`으로 처리하면 사용자의 실제 의도와 다른 결과가 나올 수 있다.
+- 매입 가능 여부를 정확하게 판단하려면 올바른 답변을 다시 입력받는 것이 좋다.
+
+### 설계 기준
+
+- `AnswerType.fromInput()`은 입력값을 enum으로 변환하는 책임을 가진다.
+- 다시 입력받는 반복 흐름은 `InputView`에서 처리하는 방향을 고려한다.
+- 잘못된 입력을 어떻게 알릴지는 구현 단계에서 결정한다.
+
+---
+
+## 6. InputView에서 fromInput 호출 여부
+
+### 결정
+
+`InputView.inputAnswer()` 내부에서 `AnswerType.fromInput()`을 호출할 수 있다.
+
+### 이유
+
+- `InputView`는 사용자 입력을 받는 역할을 가진다.
+- 사용자가 입력한 문자열을 프로그램 내부에서 사용할 수 있는 `AnswerType`으로 변환해야 한다.
+- 변환 자체의 기준은 `AnswerType`이 가지고, 입력 반복 흐름은 `InputView`가 담당하는 구조가 자연스럽다.
+
+### 설계 기준
+
+- `InputView`는 매입 가능 여부를 판단하지 않는다.
+- `InputView`는 `BookConditionResponse`를 직접 만들지 않는다.
+- `InputView`는 사용자 입력 문자열을 받아 `AnswerType`으로 변환된 값을 반환한다.
+
+---
+
+## 7. QuestionProvider 설계
+
+### 역할
+
+`QuestionProvider`는 책 상태 질문 목록을 제공하는 객체다.
+
+### 반환 타입
+
+```java
+List<String>
+```
+
+### 이유
+
+- 질문을 제공하는 시점에는 아직 사용자의 답변이 없다.
+- 따라서 `List<BookConditionResponse>`가 아니라 `List<String>`을 반환하는 것이 자연스럽다.
+- 1차 MVP에서는 질문 문장만 있으면 질문 출력과 응답 수집이 가능하다.
+
+### 추후 확장 후보
+
+나중에 질문별 매입불가 사유, 질문 ID, 상태 등급 계산 기준 등이 필요해지면 `Question` 객체로 확장할 수 있다.
+
+```java
+List<Question>
+```
+
+### 설계 기준
+
+- 1차 MVP에서는 단순하게 `List<String>`으로 시작한다.
+- 질문 목록은 `Main`에서 직접 관리하지 않고 별도 클래스로 분리한다.
+- DB 저장이나 서버 조회는 이후 고도화 단계에서 고려한다.
+
+---
+
+## 8. Main에서 BookConditionResponse 생성 여부
+
+### 결정
+
+현재 단계에서는 `Main`에서 `question + answerType`을 묶어 `BookConditionResponse`를 생성하는 것을 허용한다.
+
+### 이유
+
+- 1차 MVP 범위에서는 흐름이 단순하다.
+- 지금 `ResponseFactory` 같은 별도 객체를 만들면 오히려 구조가 복잡해질 수 있다.
+- 현재 목표는 최소 클래스 구조를 이해하고 작성하는 것이다.
+
+### 설계 기준
+
+- `Main`은 전체 흐름을 조립한다.
+- 현재 단계에서는 `BookConditionResponse` 생성까지 허용한다.
+- 나중에 질문/응답 조립 로직이 복잡해지면 별도 객체로 분리한다.
+
+---
+
+## 9. 오늘 결정한 핵심 설계 기준
+
+- `BookConditionResponse`는 `question`과 `answerType`을 생성자로 받는다.
+- `etcText`는 `AnswerType`이 아니라 `BookConditionResponse`에 둔다.
+- `BuyDecisionResult`는 `buyable`, `rejectReasons`, `message`를 생성자에서 모두 받는다.
+- 잘못된 입력은 `UNKNOWN`으로 처리하지 않고 다시 입력받도록 한다.
+- `InputView`는 `AnswerType.fromInput()`을 호출할 수 있다.
+- `QuestionProvider`는 1차 MVP에서 `List<String>`을 반환한다.
+- `Main`에서 `BookConditionResponse`를 생성하는 것은 현재 단계에서 허용한다.
+- `ResponseFactory`는 아직 만들지 않는다.
+- 1차 MVP에서는 단순한 구조를 우선하고, 복잡해지는 시점에 분리한다.
+
+---
+
+## 10. 다음 과제에서 할 일
+
+다음 과제에서는 오늘 정리한 설계를 바탕으로 실제 Java 클래스 파일을 생성한다.
+
+### 다음 과제 범위
+
+- `domain` 패키지 생성
+- `AnswerType` enum 생성
+- `BookConditionResponse` 클래스 생성
+- `BuyDecisionResult` 클래스 생성
+- `QuestionProvider` 클래스 생성 여부 판단
+- `InputView`, `OutputView`, `BuyDecisionService`, `Main` 클래스 생성
+- 필드, 생성자, getter, 메서드 시그니처 작성
+
+### 다음 과제 전 생각할 질문
+
+- `BuyDecisionResult`의 필드는 모두 `final`로 둘 수 있을까?
+- `rejectReasons`는 생성자에서 받은 뒤 그대로 저장해도 될까?
+- `AnswerType.fromInput()`은 잘못된 입력을 어떻게 표현할까?
+- `InputView`는 잘못된 입력을 어떻게 반복 처리할까?
+- `QuestionProvider`는 클래스 이름으로 충분할까, 아니면 `BookConditionQuestionProvider`처럼 더 구체적인 이름이 좋을까?

@@ -855,3 +855,229 @@ BookConditionResponse 생성
 - 최종 `BuyDecisionResult`는 모든 질문이 끝난 뒤 한 번만 생성한다.
 - `BuyDecisionService`는 응답 1개를 검증하는 책임을 가진다.
 - `Main`은 질문 반복 흐름과 사유 누적 흐름을 연결한다.
+
+---
+
+# 설계 보완 - 매입불가 즉시 종료 흐름 반영
+
+## 1. 변경 배경
+
+기존 설계에서는 각 답변을 평가하면서 매입불가 사유를 `rejectReasons`에 누적하고,
+모든 질문이 끝난 뒤 최종 `BuyDecisionResult`를 생성하는 흐름을 고려했다.
+
+하지만 1차 MVP의 목표는 사용자가 빠르게 매입 가능 여부를 확인하는 것이다.
+따라서 매입불가 조건이 하나라도 발견되면 더 이상 질문을 진행하지 않고,
+즉시 매입불가 결과를 반환하는 방식이 더 적절하다고 판단했다.
+
+---
+
+## 2. 변경된 판단 흐름
+
+```text
+질문 목록 준비
+→ 질문 1개 출력
+→ 사용자 답변 입력
+→ BookConditionResponse 생성
+→ BuyDecisionService가 응답 1개 평가
+→ 매입불가 조건이면 즉시 BuyDecisionResult 생성 후 종료
+→ 매입불가 조건이 아니면 다음 질문 진행
+→ 모든 질문을 통과하면 매입 가능 BuyDecisionResult 생성
+→ 결과 출력
+```
+
+---
+
+## 3. 매입불가 즉시 종료 기준
+
+1차 MVP에서는 매입불가 사유를 여러 개 누적하지 않는다.
+
+```text
+매입불가 사유 발견
+→ 즉시 판단 종료
+→ 매입불가 결과 출력
+```
+
+이 방식은 사용자가 불필요한 질문에 계속 답하지 않아도 된다는 장점이 있다.
+
+단, 추후 고도화 단계에서는 책 상태 전체 진단을 위해 모든 매입불가 사유를 누적해서 보여주는 방식으로 확장할 수 있다.
+
+---
+
+## 4. BuyDecisionService 책임 수정
+
+### 기존에 고려했던 책임
+
+- 모든 응답을 한 번에 판단한다.
+- 또는 매입불가 사유를 누적한다.
+
+### 수정된 책임
+
+- `BookConditionResponse` 하나를 평가한다.
+- 해당 응답이 매입불가 조건인지 판단한다.
+- 매입불가라면 평가 결과에 매입불가 사유를 담는다.
+- 매입불가가 아니라면 다음 질문으로 진행 가능한 결과를 반환한다.
+
+### 메서드 후보
+
+```java
+ResponseEvaluationResult evaluateResponse(BookConditionResponse response)
+```
+
+### 설계 기준
+
+- `BuyDecisionService`는 사용자 입력을 직접 받지 않는다.
+- `BuyDecisionService`는 화면에 결과를 출력하지 않는다.
+- `BuyDecisionService`는 응답 1개에 대한 판단 책임을 가진다.
+- 최종 흐름 제어는 `Main`이 담당한다.
+
+---
+
+## 5. ResponseEvaluationResult 도입
+
+`String` 하나만으로는 응답 1개의 평가 결과를 표현하기 어렵다.
+
+필요한 정보는 다음과 같다.
+
+```text
+- 매입불가 여부
+- 매입불가 사유
+- 다음 질문으로 진행 가능한지 여부
+```
+
+따라서 응답 1개 평가 결과를 담는 객체를 도입한다.
+
+### 역할
+
+```text
+ResponseEvaluationResult
+= BookConditionResponse 하나를 평가한 결과
+```
+
+### 1차 MVP 필드 후보
+
+```java
+boolean rejected
+String rejectReason
+```
+
+### 추후 확장 후보
+
+```java
+BookConditionResponse response
+String gradeReason
+```
+
+### 설계 기준
+
+- 1차 MVP에서는 상태 등급 판정 사유를 구현하지 않는다.
+- 상태 등급 판정은 다음 단계에서 확장한다.
+- 현재는 매입불가 여부와 매입불가 사유 표현에 집중한다.
+
+---
+
+## 6. BuyDecisionResult 구조 수정
+
+기존에는 매입불가 사유 목록을 누적하기 위해 아래 구조를 고려했다.
+
+```java
+boolean buyable
+List<String> rejectReasons
+String message
+```
+
+하지만 1차 MVP에서는 매입불가 사유가 발견되면 즉시 종료하므로,
+여러 개의 매입불가 사유 목록이 필요하지 않다.
+
+### 1차 MVP 추천 구조
+
+```java
+boolean buyable
+String rejectReason
+String message
+```
+
+### 추후 확장 후보
+
+상태 등급 판정까지 포함하는 단계에서는 아래 구조로 확장할 수 있다.
+
+```java
+boolean buyable
+String rejectReason
+List<String> gradeReasons
+String message
+```
+
+### 설계 기준
+
+- 매입불가일 경우 `rejectReason`에 단일 사유를 담는다.
+- 매입가능일 경우 `rejectReason`은 비어 있거나 사용하지 않는다.
+- 상태 등급 판정 사유는 1차 MVP 이후 단계에서 추가한다.
+
+---
+
+## 7. Main 실행 흐름 수정
+
+`Main`은 전체 흐름을 조립하고 반복을 제어한다.
+
+```text
+1. InputView, OutputView, BuyDecisionService, QuestionProvider를 생성한다.
+2. 책 제목을 입력받는다.
+3. QuestionProvider에서 질문 목록을 가져온다.
+4. 질문을 하나씩 반복한다.
+5. 질문을 출력한다.
+6. 사용자의 답변을 입력받는다.
+7. question + answerType을 묶어 BookConditionResponse를 생성한다.
+8. BuyDecisionService.evaluateResponse(response)를 호출한다.
+9. 평가 결과가 매입불가이면 BuyDecisionResult를 생성하고 반복을 종료한다.
+10. 매입불가가 아니면 다음 질문으로 넘어간다.
+11. 모든 질문을 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+12. OutputView가 최종 결과를 출력한다.
+```
+
+### 설계 기준
+
+- `Main`은 직접 입력 로직을 작성하지 않는다.
+- `Main`은 직접 출력 문구를 복잡하게 작성하지 않는다.
+- `Main`은 판단 조건을 직접 가지지 않는다.
+- `Main`은 반복 흐름과 객체 연결만 담당한다.
+
+---
+
+## 8. QuestionProvider 도입
+
+질문 목록은 `Main`에서 직접 관리하지 않고 별도 객체로 분리한다.
+
+### 역할
+
+```text
+QuestionProvider
+= 책 상태 질문 목록을 제공하는 객체
+```
+
+### 메서드 후보
+
+```java
+List<String> getQuestions()
+```
+
+### 설계 기준
+
+- 1차 MVP에서는 `List<String>`으로 질문 목록을 반환한다.
+- 질문별 ID, 등급 기준, 매입불가 사유 연결은 추후 확장한다.
+- 나중에 DB 또는 서버에서 질문을 가져오는 구조로 변경할 수 있다.
+
+---
+
+## 9. 오늘 이후 과제 반영 기준
+
+앞으로 ReBook 콘솔 MVP 과제에서는 아래 기준을 따른다.
+
+- 매입불가 사유를 여러 개 누적하지 않는다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 매입불가가 아닌 경우 다음 질문으로 진행한다.
+- 모든 질문을 통과하면 매입 가능 결과를 생성한다.
+- `BuyDecisionService`는 응답 1개를 평가한다.
+- `ResponseEvaluationResult`를 도입해 응답 1개의 평가 결과를 표현한다.
+- 1차 MVP에서는 상태 등급 판정 사유를 구현하지 않는다.
+- 상태 등급 판정은 다음 단계에서 확장한다.
+- `QuestionProvider`는 질문 목록 제공 책임을 가진다.

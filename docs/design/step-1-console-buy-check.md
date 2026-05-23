@@ -63,7 +63,7 @@
 
 - 질문을 출력한다.
 - 매입 가능 여부 결과를 출력한다.
-- 매입불가 사유를 출력한다.
+- 최종 결과에 포함된 매입불가 사유 또는 안내 메시지를 출력한다.
 
 ### 설계 기준
 
@@ -77,10 +77,10 @@
 
 ### 역할
 
-- 사용자의 책 상태 응답 1개를 바탕으로 해당 답변이 매입불가 조건에 해당하는지 검증한다.
-- 매입불가 조건에 해당하면 매입불가 사유를 반환한다.
-- 매입불가 조건에 해당하지 않으면 사유를 반환하지 않는다.
-- 최종 `BuyDecisionResult`는 모든 답변 검증이 끝난 뒤 누적된 매입불가 사유 목록을 기준으로 생성한다.
+- 사용자의 책 상태 응답 1개를 평가한다.
+- 해당 응답이 매입불가 조건에 해당하는지 판단한다.
+- 매입불가 조건이면 매입불가 사유를 담은 `ResponseEvaluationResult`를 반환한다.
+- 매입불가 조건이 아니면 다음 질문으로 진행 가능한 `ResponseEvaluationResult`를 반환한다.
 
 ### 받을 값
 
@@ -88,14 +88,17 @@
 
 ### 반환할 값
 
-- 매입불가 사유
-- 단, 사유가 없을 수도 있다.
+- ResponseEvaluationResult
 
 ### 설계 기준
 
-- 모든 응답을 한 번에 판단하는 방식이 아니라, 답변 하나가 입력될 때마다 검증한다.
-- 여러 질문에서 매입불가 사유가 발생할 수 있으므로 `rejectReasons`는 별도의 `List<String>`으로 누적한다.
-- 최종 결과는 누적된 `rejectReasons`를 바탕으로 만든다.
+- 모든 응답을 한 번에 판단하지 않는다.
+- 매입 불가 사유를 여러 개 누적하지 않는다.
+- 답변 하나가 입력될 때마다 `BookConditionResponse` 하나를 평가한다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료할 수 있도록 평가 결과를 반환한다.
+- 사용자 입력은 `InputView`가 담당한다.
+- 결과 출력은 `OutputView`가 담당한다.
+- 반복 흐름 제어는 `Main`이 담당한다.
 
 ---
 
@@ -103,15 +106,22 @@
 
 ### 역할
 
-- 매입 가능 여부를 저장한다.
-- 매입불가 사유 목록을 저장한다.
+- 최종 매입 가능 여부를 저장한다.
+- 매입불가일 경우 단일 매입불가 사유를 저장한다.
 - 결과 안내 메시지를 저장한다.
 
 ### 필요한 값
 
 - buyable
-- rejectReasons
+- rejectReason
 - message
+
+### 설계 기준
+
+- 1차 MVP에서는 매입불가 사유를 여러 개 누적하지 않는다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 따라서 `List<String> rejectReasons`가 아니라 `String rejectReason`을 사용한다.
+- 모든 질문을 통과하면 매입 가능 결과를 생성한다.
 
 ---
 
@@ -152,13 +162,14 @@
 ### 역할
 
 - 객체들을 생성한다.
-- 입력 → 판단 → 출력 흐름을 연결한다.
+- 입력 → 응답 평가 → 즉시 종료 또는 다음 질문 진행 → 최종 출력 흐름을 연결한다.
 
 ### 하지 말아야 할 일
 
 - 직접 입력 로직을 작성하지 않는다.
 - 직접 매입 가능 여부를 판단하지 않는다.
 - 직접 결과 출력 로직을 복잡하게 작성하지 않는다.
+- 매입불가 사유를 여러 개 누적하지 않는다.
 
 
 # 1단계 3일차 - 콘솔 기본 클래스 구조 및 메서드 시그니처 설계
@@ -175,6 +186,7 @@ service
 
 domain
 - BuyDecisionResult
+- ResponseEvaluationResult
 - BookConditionResponse
 - AnswerType
 
@@ -189,6 +201,7 @@ main
 - `domain`은 판단에 필요한 데이터와 결과 객체를 가진다.
 - `main`은 전체 실행 흐름을 연결한다.
 - `BuyDecisionResult`와 `BookConditionResponse`는 결과와 데이터를 담는 객체이므로 `domain` 패키지에 둔다.
+- `ResponseEvaluationResult`는 응답 1개를 평가한 중간 결과 객체이므로 `domain` 패키지에 둔다.
 
 ---
 
@@ -224,7 +237,6 @@ AnswerType inputAnswer()
 
 - 질문을 출력한다.
 - 매입 가능 여부 결과를 출력한다.
-- 매입불가 사유를 출력한다.
 - 결과 안내 메시지를 출력한다.
 
 ### 예상 메서드
@@ -232,7 +244,6 @@ AnswerType inputAnswer()
 ```java
 void printQuestion(String question)
 void printResult(BuyDecisionResult result)
-void printRejectReasons(List<String> rejectReasons)
 ```
 
 ### 설계 기준
@@ -242,6 +253,7 @@ void printRejectReasons(List<String> rejectReasons)
 - `OutputView`는 매입 가능 여부를 판단하지 않는다.
 - 질문을 출력하는 시점에는 아직 사용자의 답변이 없으므로, `BookConditionResponse`가 아니라 `String question`을 받는 것이 자연스럽다.
 - 출력 메서드는 값을 반환하지 않고 화면에 출력하는 책임에 집중한다.
+- 최종 결과에 포함된 매입불가 사유 또는 안내 메시지를 출력한다.
 
 ---
 
@@ -249,30 +261,25 @@ void printRejectReasons(List<String> rejectReasons)
 
 ### 역할
 
-- 사용자의 책 상태 응답 1개를 바탕으로 매입불가 조건에 해당하는지 검증한다.
-- 매입불가 조건에 해당하면 매입불가 사유를 반환한다.
-- 매입불가 조건에 해당하지 않으면 사유를 반환하지 않는다.
+- 사용자의 책 상태 응답 1개를 평가한다.
+- 해당 응답이 매입불가 조건에 해당하는지 판단한다.
+- 매입불가 조건이면 매입불가 사유를 담은 `ResponseEvaluationResult`를 반환한다.
+- 매입불가 조건이 아니면 다음 질문으로 진행 가능한 `ResponseEvaluationResult`를 반환한다.
 
 ### 예상 메서드
 
 ```java
-String findRejectReason(BookConditionResponse response)
-```
-
-추후 확장 후보:
-
-```java
-Optional<String> findRejectReason(BookConditionResponse response)
+ResponseEvaluationResult evaluateResponse(BookConditionResponse response)
 ```
 
 ### 설계 기준
 
-- `BuyDecisionService`는 전체 응답 목록을 한 번에 판단하지 않는다.
-- 답변 하나가 입력될 때마다 `BookConditionResponse` 하나를 받아 검증한다.
-- 매입불가 조건에 해당하면 매입불가 사유를 반환한다.
-- 매입불가 조건에 해당하지 않으면 사유를 반환하지 않는다.
-- 최종 `BuyDecisionResult`는 `Main` 흐름에서 누적된 `rejectReasons`를 기준으로 생성한다.
-- `Optional`은 추후 학습 후 적용할 수 있으므로, 1차 MVP에서는 단순한 방식으로 시작한다.
+- BuyDecisionService는 전체 응답 목록을 한 번에 판단하지 않는다.
+- BuyDecisionService는 매입불가 사유 목록을 누적하지 않는다.
+- BuyDecisionService는 응답 1개에 대한 판단 책임을 가진다.
+- 사용자 입력을 직접 받지 않는다.
+- 결과를 직접 출력하지 않는다.
+- 반복 흐름 제어는 Main이 담당한다.
 
 ---
 
@@ -280,27 +287,50 @@ Optional<String> findRejectReason(BookConditionResponse response)
 
 ### 역할
 
-- 매입 가능 여부 판단 결과를 저장한다.
-- 매입불가 사유 목록을 저장한다.
+- 최종 매입 가능 여부 판단 결과를 저장한다.
+- 매입불가일 경우 단일 매입 불가 사유를 저장한다.
 - 결과 안내 메시지를 저장한다.
 
 ### 필요한 값
 
 ```java
 boolean buyable
-List<String> rejectReasons
+String rejectReason
 String message
 ```
 
 ### 설계 기준
 
 - `boolean` 하나만 반환하면 매입불가 사유와 안내 메시지를 표현하기 어렵다.
-- 매입불가 사유는 여러 개일 수 있으므로 `List<String>`으로 관리한다.
-- 결과 안내 메시지는 매입 가능 여부에 따라 달라질 수 있으므로 결과 객체에 포함한다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 상태 등급 판정 사유는 1차 MVP 이후 단계에서 추가한다.
 
 ---
 
-## 6. BookConditionResponse
+## 6. ResponseEvaluationResult
+
+### 역할
+
+- `BookConditionResponse` 하나를 평가한 중간 결과를 저장한다.
+- 현재 응답이 매입불가 조건에 해당하는지 표현한다.
+- 매입불가일 경우 매입불가 사유를 저장한다.
+
+### 필요한 값
+
+```java
+boolean rejected
+String rejectReason
+```
+
+### 설계 기준
+- String 하나만으로는 응답 평가 결과를 표현하기 어렵다.
+- boolean 하나만으로는 매입불가 사유를 함께 표현하기 어렵다. 따라서 응답 1개 평가 결과를 별도 객체로 분리한다.
+- rejected = true이면 현재 응답이 매입불가 조건에 해당한다.
+- rejected = false이면 다음 질문으로 진행할 수 있다.
+- 1차 MVP에서는 상태 등급 판정 사유를 포함하지 않는다.
+- 상태 등급 판정은 다음 단계에서 확장한다.
+
+## 7. BookConditionResponse
 
 ### 역할
 
@@ -321,13 +351,13 @@ String etcText
 
 ### 설계 기준
 
-- `BookConditionResponse` 하나는 질문 1개와 답변 1개를 의미한다.
-- 여러 질문에 대한 응답은 `List<BookConditionResponse>`로 관리한다.
+- `BookConditionResponse`는 질문 하나를 평가하기 위한 단위로 사용한다.
+- `Main`은 질문마다 `BookConditionResponse`를 생성하고, 즉시 `BuyDecisionService`에 전달한다.
 - `OTHER` 답변이 들어올 경우, 기타 내용을 저장하기 위해 `etcText`가 필요할 수 있다.
 
 ---
 
-## 7. AnswerType
+## 8. AnswerType
 
 ### 역할
 
@@ -359,31 +389,29 @@ AnswerType fromInput(String input)
 
 ---
 
-## 8. Main
+## 9. Main
 
 ### 역할
 
 - 객체들을 생성한다.
-- 입력 → 답변별 검증 → 최종 결과 생성 → 출력 흐름을 연결한다.
+- 입력 → 응답 평가 → 즉시 종료 또는 다음 질문 진행 → 최종 출력 흐름을 연결한다.
 
 ### 실행 흐름
 
 ```text
-1. InputView, OutputView, BuyDecisionService 생성
+1. InputView, OutputView, BuyDecisionService, QuestionProvider를 생성
 2. 책 제목 입력
-3. 질문 목록 준비
-4. 매입불가 사유를 담을 List<String> rejectReasons 생성
-5. 질문을 하나씩 반복한다.
-6. 질문 출력
-7. 사용자 답변 입력
-8. question + answerType을 묶어 BookConditionResponse 생성
-9. BuyDecisionService가 현재 응답 1개를 검증
-10. 매입불가 사유가 있으면 rejectReasons에 추가
-11. 모든 질문이 끝나면 rejectReasons가 비어 있는지 확인
-12. rejectReasons가 비어 있으면 buyable = true
-13. rejectReasons가 하나 이상 있으면 buyable = false
-14. BuyDecisionResult 생성
-15. 결과 출력
+3. QuestionProvider에서 질문 목록을 가져옴.
+4. 질문을 하니씩 반복한다.
+5. OutputView에서 질문을 출력한다.
+6. InputView에서 사용자 답변을 입력받는다. 
+7. question + answerType을 묶어 BookConditionResponse 생성한다.
+8. BuyDecisionService.evaluateResponse(response)를 호출한다.
+9. ResponseEvaluationResult가 rejected 상태면 매입불가 BuyDecisionResult를 생성한다.
+10. 매입 불가 결과를 출력하고 프로그램 흐름을 종료한다.
+11. rejected 상태가 아니면 다음 질문으로 넘어간다.
+12. 모든 질문을 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+13. OutputView가 최종 결과를 출력한다.
 ```
 
 ### 하지 말아야 할 일
@@ -392,6 +420,7 @@ AnswerType fromInput(String input)
 - 직접 매입 가능 여부를 판단하지 않는다.
 - 직접 결과 출력 문구를 복잡하게 작성하지 않는다.
 - 바코드 흐름을 현재 단계에 포함하지 않는다.
+- 매입불가 사유를 여러 개 누적하지 않는다.
 
 ### 설계 기준
 
@@ -399,27 +428,33 @@ AnswerType fromInput(String input)
 - 판단은 `BuyDecisionService`가 담당한다.
 - 입력은 `InputView`가 담당한다.
 - 출력은 `OutputView`가 담당한다.
-- 매입불가 사유는 질문에 대한 답변이 끝날 때마다 검증하고 `rejectReasons`에 누적한다.
-- 최종 `BuyDecisionResult`는 모든 질문이 끝난 뒤 한 번만 생성한다.
+- 질문 목록 제공은 QuestionProvider가 담당한다.
+- Main은 ResponseEvaluationResult를 보고 반복을 계속할지 종료할지만 결정한다.
+- `ResponseEvaluationResult`는 `BuyDecisionService`가 생성한다.
+- `BuyDecisionResult`는 전체 흐름을 제어하는 `Main`에서 생성한다.
+- 추후 결과 생성 로직이 복잡해지면 `BuyDecisionResult`의 정적 팩토리 메서드나 별도 Factory로 분리할 수 있다.
+- 모든 질문을 통과하면 매입 가능 BuyDecisionResult를 생성한다.
 - 1차 MVP에서는 바코드 흐름을 제외하고 질문 기반 매입 가능 여부 판단에 집중한다.
 
 ---
 
-## 9. 오늘 결정한 핵심 설계 기준
+## 10. 오늘 결정한 핵심 설계 기준
 
-- `BuyDecisionResult`와 `BookConditionResponse`는 `domain` 패키지에 둔다.
+- `BuyDecisionResult`, `ResponseEvaluationResult`, `BookConditionResponse`는 `domain` 패키지에 둔다.
 - `InputView`는 `BookConditionResponse`를 직접 만들지 않고, 사용자의 답변을 `AnswerType`으로 반환한다.
 - 질문 출력 시점에는 아직 답변이 없으므로 `OutputView`의 질문 출력 메서드는 `String question`을 받는다.
 - `AnswerType`은 사용자 입력 문자열을 enum으로 변환하는 메서드를 가진다.
-- `BuyDecisionService`는 `BookConditionResponse` 하나를 받아 현재 응답이 매입불가 조건에 해당하는지 검증한다.
-- 매입불가 사유는 답변 하나가 끝날 때마다 `rejectReasons`에 누적한다.
-- 최종 `BuyDecisionResult`는 모든 질문이 끝난 뒤 누적된 `rejectReasons`를 기준으로 생성한다.
-- 매입불가 사유는 여러 개일 수 있으므로 `List<String>`으로 관리한다.
+- `BuyDecisionService`는 `BookConditionResponse` 하나를 받아 현재 응답이 매입불가 조건에 해당하는지 평가한다.
+- 응답 1개의 평가 결과는 `ResponseEvaluationResult`로 표현한다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 매입불가 사유는 1차 MVP에서 단일 사유만 사용한다.
+- 최종 `BuyDecisionResult`는 매입불가 발견 시 또는 모든 질문 통과 시 생성한다.
+- 1차 MVP에서는 상태 등급 판정 사유를 포함하지 않는다.
+- 상태 등급 판정은 다음 단계에서 확장한다.
 - 1차 MVP에서는 바코드 흐름을 `Main`에 포함하지 않고, 질문 기반 매입 가능 여부 판단에 집중한다.
-
 ---
 
-## 10. 다음 구현 단계에서 고민할 점
+## 11. 다음 구현 단계에서 고민할 점
 
 - `BuyDecisionResult` 생성자는 어떤 값을 받아야 하는가?
 - `BookConditionResponse` 생성자는 어떤 값을 받아야 하는가?
@@ -427,8 +462,11 @@ AnswerType fromInput(String input)
 - `Main`에서 `question`과 `answerType`을 묶는 코드는 어디에 두는 것이 좋은가?
 - `OutputView`의 결과 출력 메서드는 `BuyDecisionResult` 하나만 받아도 충분한가?
 - 질문 목록은 `Main`에 둘 것인가, 별도 객체로 분리할 것인가?
-- `BuyDecisionService.findRejectReason()`은 사유가 없을 때 무엇을 반환해야 하는가?
-- 매입불가 사유를 누적하는 `rejectReasons`는 Main에서 관리해도 되는가?
+- `ResponseEvaluationResult` 생성자는 어떤 값을 받아야 하는가?
+- `ResponseEvaluationResult`는 매입불가가 아닐 때 `rejectReason`을 어떻게 둘 것인가?
+- `BuyDecisionResult`는 매입 가능 결과와 매입불가 결과를 어떻게 구분할 것인가?
+- 매입불가 즉시 종료 흐름에서 `break`를 사용할 것인가, `return`을 사용할 것인가?
+- `QuestionProvider`는 어느 패키지에 둘 것인가?
 - 최종 `BuyDecisionResult`는 어느 시점에 생성하는 것이 자연스러운가?
 
 ---
@@ -499,32 +537,34 @@ BookConditionResponse(String question, AnswerType answerType, String etcText)
 
 ### 역할
 
-`BuyDecisionResult`는 매입 가능 여부 판단 결과를 담는 객체다.
+`BuyDecisionResult`는 최종 매입 가능 여부 판단 결과를 담는 객체다.
 
 ### 필요한 값
 
 ```java
 boolean buyable
-List<String> rejectReasons
+String rejectReason
 String message
 ```
 
 ### 생성자 방향
 
 ```java
-BuyDecisionResult(boolean buyable, List<String> rejectReasons, String message)
+BuyDecisionResult(boolean buyable, String rejectReason, String message)
 ```
 
 ### 이유
 
 - 판단 결과 객체는 생성된 뒤 값이 자주 바뀌기보다, 생성 시점에 필요한 값을 모두 받는 것이 안전하다.
-- `buyable`만 받으면 `rejectReasons`와 `message`를 어디에서 채울지 애매해질 수 있다.
-- `setter`로 값을 하나씩 변경하는 방식은 결과 객체의 일관성을 해칠 수 있다.
+- 1차 MVP에서는 매입불가 사유를 여러 개 누적하지 않는다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료하므로 단일 rejectReason만 있으면 충분하다.
+- setter로 값을 하나씩 변경하는 방식은 결과 객체의 일관성을 해칠 수 있다.
 
 ### 설계 기준
 
-- 1차 MVP에서는 생성자에서 `buyable`, `rejectReasons`, `message`를 모두 받는 방향으로 설계한다.
+- 1차 MVP에서는 생성자에서 `buyable`, `rejectReason`, `message`를 모두 받는 방향으로 설계한다.
 - 매입 가능 결과용 메서드와 매입 불가 결과용 메서드는 추후 리팩터링 후보로 둔다.
+- 상태 등급 판정 사유는 다음 단계에서 확장한다.
 
 ---
 
@@ -635,32 +675,33 @@ List<Question>
 
 ---
 
-## 9. 답변별 매입불가 검증 흐름
+## 9. 매입불가 즉시 종료 흐름
 
 ### 결정
 
-ReBook 콘솔 MVP에서는 모든 질문에 대한 답변을 받은 뒤 한 번에 판단하는 방식이 아니라,
-각 질문에 대한 답변이 끝날 때마다 해당 응답이 매입불가 조건인지 검증하는 방식을 사용한다.
+ReBook 콘솔 MVP에서는 매입불가 사유를 여러 개 누적하지 않는다.
+각 질문에 대한 답변을 평가했을 때 매입불가 조건이 발견되면 즉시 판단을 종료한다.
 
 ### 처리 흐름
 
 1. 질문을 하나 출력한다.
 2. 사용자가 답변을 입력한다.
 3. 질문과 답변을 묶어 `BookConditionResponse`를 생성한다.
-4. `BuyDecisionService`가 현재 응답 1개를 검증한다.
-5. 매입불가 조건에 해당하면 매입불가 사유를 반환한다.
-6. 반환된 사유가 있으면 `rejectReasons` 목록에 추가한다.
-7. 모든 질문이 끝나면 `rejectReasons`가 비어 있는지 확인한다.
-8. `rejectReasons`가 비어 있으면 매입 가능 결과를 생성한다.
-9. `rejectReasons`가 하나 이상 있으면 매입 불가 결과를 생성한다.
+4. `BuyDecisionService`가 현재 응답 1개를 평가한다.
+5. 평가 결과를 `ResponseEvaluationResult`로 반환한다.
+6. `ResponseEvaluationResult`가 매입불가 상태라면 즉시 `BuyDecisionResult`를 생성한다.
+7. 매입불가 결과를 출력하고 질문 반복을 종료한다.
+8. 매입불가가 아니라면 다음 질문으로 진행한다.
+9. 모든 질문을 통과하면 매입 가능 `BuyDecisionResult`를 생성한다.
 
 ### 설계 기준
 
 - `BookConditionResponse` 하나는 질문 1개와 답변 1개를 의미한다.
-- 매입불가 여부는 답변 하나가 끝날 때마다 검증한다.
-- 매입불가 사유는 `List<String> rejectReasons`에 누적한다.
-- 최종 `BuyDecisionResult`는 누적된 `rejectReasons`를 기준으로 생성한다.
-- `BuyDecisionService`는 현재 응답 1개를 검증하는 책임을 가진다.
+- 매입불가 여부는 답변 하나가 끝날 때마다 평가한다.
+- 매입불가 사유는 여러 개 누적하지 않는다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 응답 1개의 평가 결과는 `ResponseEvaluationResult`로 표현한다.
+- 최종 `BuyDecisionResult`는 매입불가 발견 시 또는 모든 질문 통과 시 생성한다.
 
 ---
 
@@ -668,18 +709,18 @@ ReBook 콘솔 MVP에서는 모든 질문에 대한 답변을 받은 뒤 한 번�
 
 - `BookConditionResponse`는 `question`과 `answerType`을 생성자로 받는다.
 - `etcText`는 `AnswerType`이 아니라 `BookConditionResponse`에 둔다.
-- `BuyDecisionResult`는 `buyable`, `rejectReasons`, `message`를 생성자에서 모두 받는다.
 - 잘못된 입력은 `UNKNOWN`으로 처리하지 않고 다시 입력받도록 한다.
 - `InputView`는 `AnswerType.fromInput()`을 호출할 수 있다.
 - `QuestionProvider`는 1차 MVP에서 `List<String>`을 반환한다.
 - `Main`에서 `BookConditionResponse`를 생성하는 것은 현재 단계에서 허용한다.
 - `ResponseFactory`는 아직 만들지 않는다.
 - 1차 MVP에서는 단순한 구조를 우선하고, 복잡해지는 시점에 분리한다.
-- 모든 질문에 대한 응답을 한 번에 검증하지 않는다.
-- 답변 하나가 끝날 때마다 해당 응답의 매입불가 여부를 검증한다.
-- 매입불가 사유는 `List<String> rejectReasons`에 누적한다.
-- 최종 `BuyDecisionResult`는 모든 질문이 끝난 뒤 한 번만 생성한다.
-- `BuyDecisionService`는 전체 결과를 만드는 책임보다, 응답 1개를 검증하는 책임을 가진다.
+- `BuyDecisionResult`는 `buyable`, `rejectReason`, `message`를 생성자에서 모두 받는다.
+- 매입불가 조건이 발견되면 즉시 판단을 종료한다.
+- 매입불가 사유는 1차 MVP에서 단일 사유만 사용한다.
+- 응답 1개의 평가 결과는 `ResponseEvaluationResult`로 표현한다.
+- 최종 `BuyDecisionResult`는 매입불가 발견 시 또는 모든 질문 통과 시 생성한다.
+- `BuyDecisionService`는 응답 1개를 평가하는 책임을 가진다.
 
 ---
 
@@ -692,169 +733,20 @@ ReBook 콘솔 MVP에서는 모든 질문에 대한 답변을 받은 뒤 한 번�
 - `domain` 패키지 생성
 - `AnswerType` enum 생성
 - `BookConditionResponse` 클래스 생성
+- `ResponseEvaluationResult` 클래스 생성
 - `BuyDecisionResult` 클래스 생성
-- `QuestionProvider` 클래스 생성 여부 판단
+- `QuestionProvider` 클래스 생성
 - `InputView`, `OutputView`, `BuyDecisionService`, `Main` 클래스 생성
 - 필드, 생성자, getter, 메서드 시그니처 작성
 
 ### 다음 과제 전 생각할 질문
 
-- `BuyDecisionResult`의 필드는 모두 `final`로 둘 수 있을까?
-- `rejectReasons`는 생성자에서 받은 뒤 그대로 저장해도 될까?
-- `AnswerType.fromInput()`은 잘못된 입력을 어떻게 표현할까?
-- `InputView`는 잘못된 입력을 어떻게 반복 처리할까?
-- `QuestionProvider`는 클래스 이름으로 충분할까, 아니면 `BookConditionQuestionProvider`처럼 더 구체적인 이름이 좋을까?
-
-
----
-
-# 설계 보완 - 답변별 매입불가 검증 흐름 반영
-
-## 1. 변경 배경
-
-기존 설계는 모든 질문에 대한 답변을 받은 뒤,
-`List<BookConditionResponse>` 전체를 `BuyDecisionService`에 전달하여 한 번에 매입 가능 여부를 판단하는 방식에 가까웠다.
-
-하지만 ReBook의 콘솔 MVP에서는 각 질문에 대한 답변이 끝날 때마다 해당 응답이 매입불가 조건에 해당하는지 검증하고,
-매입불가 사유를 누적하는 방식이 더 적절하다고 판단했다.
-
----
-
-## 2. 변경된 판단 흐름
-
-```text
-질문 출력
-→ 사용자 답변 입력
-→ BookConditionResponse 생성
-→ 현재 응답 1개 검증
-→ 매입불가 사유가 있으면 rejectReasons에 추가
-→ 다음 질문 반복
-→ 모든 질문 종료 후 rejectReasons 기준으로 최종 결과 생성
-```
-
----
-
-## 3. BuyDecisionService 책임 변경
-
-### 기존 책임
-
-- 여러 질문에 대한 응답 목록을 한 번에 받아 매입 가능 여부를 판단한다.
-- `BuyDecisionResult`를 반환한다.
-
-### 변경 후 책임
-
-- `BookConditionResponse` 하나를 받아 해당 응답이 매입불가 조건인지 검증한다.
-- 매입불가 조건에 해당하면 매입불가 사유를 반환한다.
-- 매입불가 조건에 해당하지 않으면 사유를 반환하지 않는다.
-
-### 변경 후 메서드 후보
-
-```java
-String findRejectReason(BookConditionResponse response)
-```
-
-추후 확장 후보:
-
-```java
-Optional<String> findRejectReason(BookConditionResponse response)
-```
-
-### 설계 기준
-
-- `BuyDecisionService`는 응답 1개를 검증하는 책임을 가진다.
-- 최종 결과 생성은 누적된 `rejectReasons`를 바탕으로 수행한다.
-- `Optional`은 추후 학습 후 적용할 수 있으므로, 1차 MVP에서는 단순한 방식으로 시작한다.
-
----
-
-## 4. Main 실행 흐름 변경
-
-### 기존 흐름
-
-```text
-모든 답변 수집
-→ List<BookConditionResponse> 생성
-→ BuyDecisionService에 전체 전달
-→ BuyDecisionResult 반환
-```
-
-### 변경 후 흐름
-
-```text
-1. InputView, OutputView, BuyDecisionService 생성
-2. 책 제목 입력
-3. 질문 목록 준비
-4. 매입불가 사유를 담을 List<String> rejectReasons 생성
-5. 질문을 하나씩 반복한다.
-6. 질문 출력
-7. 사용자 답변 입력
-8. question + answerType을 묶어 BookConditionResponse 생성
-9. BuyDecisionService가 현재 응답 1개를 검증
-10. 매입불가 사유가 있으면 rejectReasons에 추가
-11. 모든 질문이 끝나면 rejectReasons가 비어 있는지 확인
-12. rejectReasons가 비어 있으면 buyable = true
-13. rejectReasons가 하나 이상 있으면 buyable = false
-14. BuyDecisionResult 생성
-15. 결과 출력
-```
-
----
-
-## 5. BuyDecisionResult 생성 기준
-
-최종 결과는 누적된 `rejectReasons`를 기준으로 생성한다.
-
-```text
-rejectReasons가 비어 있음
-→ 매입 가능
-
-rejectReasons가 하나 이상 있음
-→ 매입 불가
-```
-
-### 생성자 방향
-
-```java
-BuyDecisionResult(boolean buyable, List<String> rejectReasons, String message)
-```
-
-### 설계 기준
-
-- `BuyDecisionResult`는 여전히 최종 결과 객체다.
-- 답변 하나마다 `BuyDecisionResult`를 만들지 않는다.
-- 모든 답변 검증이 끝난 뒤 한 번만 최종 결과를 만든다.
-
----
-
-## 6. BookConditionResponse와의 관계
-
-`BookConditionResponse` 하나는 질문 1개와 답변 1개를 담는다.
-
-```text
-BookConditionResponse 하나
-= 질문 1개 + 답변 1개
-```
-
-따라서 답변 하나가 끝날 때마다 검증하는 흐름과 잘 맞는다.
-
-```text
-BookConditionResponse 생성
-→ 해당 응답 검증
-→ 매입불가 사유 누적
-```
-
----
-
-## 7. 오늘 이후 과제 반영 기준
-
-앞으로 ReBook 콘솔 MVP 과제에서는 아래 흐름을 기준으로 설계하고 구현한다.
-
-- 모든 응답을 받은 뒤 한 번에 검증하지 않는다.
-- 질문 하나에 대한 답변이 끝날 때마다 해당 응답을 검증한다.
-- 매입불가 사유는 `List<String> rejectReasons`에 누적한다.
-- 최종 `BuyDecisionResult`는 모든 질문이 끝난 뒤 한 번만 생성한다.
-- `BuyDecisionService`는 응답 1개를 검증하는 책임을 가진다.
-- `Main`은 질문 반복 흐름과 사유 누적 흐름을 연결한다.
+- `ResponseEvaluationResult`의 필드는 모두 `final`로 둘 수 있을까?
+- `ResponseEvaluationResult`는 매입불가가 아닐 때 `rejectReason`을 어떻게 표현할까?
+- `BuyDecisionResult`는 매입 가능 결과와 매입불가 결과를 어떻게 구분할까?
+- `BuyDecisionResult`에서 `rejectReason`은 언제 사용될까?
+- `QuestionProvider`는 어느 패키지에 두는 것이 좋을까?
+- `Main`은 매입불가 즉시 종료 흐름을 어떻게 표현할까?
 
 ---
 
@@ -862,7 +754,7 @@ BookConditionResponse 생성
 
 ## 1. 변경 배경
 
-기존 설계에서는 각 답변을 평가하면서 매입불가 사유를 `rejectReasons`에 누적하고,
+기존 설계에서는 각 답변을 평가하면서 매입불가 사유 목록을 누적하고,
 모든 질문이 끝난 뒤 최종 `BuyDecisionResult`를 생성하는 흐름을 고려했다.
 
 하지만 1차 MVP의 목표는 사용자가 빠르게 매입 가능 여부를 확인하는 것이다.
@@ -928,6 +820,7 @@ ResponseEvaluationResult evaluateResponse(BookConditionResponse response)
 - `BuyDecisionService`는 사용자 입력을 직접 받지 않는다.
 - `BuyDecisionService`는 화면에 결과를 출력하지 않는다.
 - `BuyDecisionService`는 응답 1개에 대한 판단 책임을 가진다.
+- `BuyDecisionService`는 매입불가 사유 목록을 직접 누적하지 않는다.
 - 최종 흐름 제어는 `Main`이 담당한다.
 
 ---
@@ -972,12 +865,13 @@ String gradeReason
 - 1차 MVP에서는 상태 등급 판정 사유를 구현하지 않는다.
 - 상태 등급 판정은 다음 단계에서 확장한다.
 - 현재는 매입불가 여부와 매입불가 사유 표현에 집중한다.
+- 매입불가가 아닌 경우에는 `rejected = false`로 표현한다.
 
 ---
 
 ## 6. BuyDecisionResult 구조 수정
 
-기존에는 매입불가 사유 목록을 누적하기 위해 아래 구조를 고려했다.
+기존 고려했던 구조:
 
 ```java
 boolean buyable
@@ -1012,6 +906,7 @@ String message
 - 매입불가일 경우 `rejectReason`에 단일 사유를 담는다.
 - 매입가능일 경우 `rejectReason`은 비어 있거나 사용하지 않는다.
 - 상태 등급 판정 사유는 1차 MVP 이후 단계에서 추가한다.
+- 1차 MVP에서는 `List<String> rejectReasons`를 사용하지 않는다.
 
 ---
 
@@ -1024,14 +919,16 @@ String message
 2. 책 제목을 입력받는다.
 3. QuestionProvider에서 질문 목록을 가져온다.
 4. 질문을 하나씩 반복한다.
-5. 질문을 출력한다.
-6. 사용자의 답변을 입력받는다.
+5. OutputView가 질문을 출력한다.
+6. InputView가 사용자의 답변을 입력받는다.
 7. question + answerType을 묶어 BookConditionResponse를 생성한다.
 8. BuyDecisionService.evaluateResponse(response)를 호출한다.
-9. 평가 결과가 매입불가이면 BuyDecisionResult를 생성하고 반복을 종료한다.
-10. 매입불가가 아니면 다음 질문으로 넘어간다.
-11. 모든 질문을 통과하면 매입 가능 BuyDecisionResult를 생성한다.
-12. OutputView가 최종 결과를 출력한다.
+9. 평가 결과가 매입불가이면 BuyDecisionResult를 생성한다.
+10. OutputView가 매입불가 결과를 출력한다.
+11. 프로그램 흐름을 종료한다.
+12. 매입불가가 아니면 다음 질문으로 넘어간다.
+13. 모든 질문을 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+14. OutputView가 매입 가능 결과를 출력한다.
 ```
 
 ### 설계 기준
@@ -1040,6 +937,7 @@ String message
 - `Main`은 직접 출력 문구를 복잡하게 작성하지 않는다.
 - `Main`은 판단 조건을 직접 가지지 않는다.
 - `Main`은 반복 흐름과 객체 연결만 담당한다.
+- `Main`은 `ResponseEvaluationResult`를 보고 반복을 종료할지 계속할지만 결정한다.
 
 ---
 
@@ -1078,6 +976,7 @@ List<String> getQuestions()
 - 모든 질문을 통과하면 매입 가능 결과를 생성한다.
 - `BuyDecisionService`는 응답 1개를 평가한다.
 - `ResponseEvaluationResult`를 도입해 응답 1개의 평가 결과를 표현한다.
+- `BuyDecisionResult`는 1차 MVP에서 `buyable`, `rejectReason`, `message`를 가진다.
 - 1차 MVP에서는 상태 등급 판정 사유를 구현하지 않는다.
 - 상태 등급 판정은 다음 단계에서 확장한다.
 - `QuestionProvider`는 질문 목록 제공 책임을 가진다.

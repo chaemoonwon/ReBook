@@ -750,7 +750,7 @@ ReBook 콘솔 MVP에서는 매입불가 사유를 여러 개 누적하지 않는
 
 ---
 
-# 설계 보완 - 매입불가 즉시 종료 흐름 반영
+# 설계 보완 - 매입불가 즉시 종료 흐름 반영 (5일차)
 
 ## 1. 변경 배경
 
@@ -980,3 +980,352 @@ List<String> getQuestions()
 - 1차 MVP에서는 상태 등급 판정 사유를 구현하지 않는다.
 - 상태 등급 판정은 다음 단계에서 확장한다.
 - `QuestionProvider`는 질문 목록 제공 책임을 가진다.
+
+# 1단계 6일차 - Java 클래스 파일 생성 및 메서드 시그니처 작성
+
+## 1. 오늘 과제 목적
+
+1단계 6일차 과제에서는 지금까지 설계한 내용을 바탕으로 실제 Java 콘솔 프로젝트 환경을 만들고,
+ReBook 콘솔 MVP에 필요한 기본 클래스 파일과 메서드 시그니처를 작성했다.
+
+이번 단계의 핵심은 전체 로직 구현이 아니라,
+앞으로 매입 가능 여부 판단 흐름을 연결할 수 있도록 **패키지 구조, 클래스 구조, 필드, 생성자, getter, 메서드 시그니처**를 준비하는 것이다.
+
+추가로 사용자 입력 문자열을 `AnswerType` enum으로 변환하는 기초 입력 처리 흐름까지 구현했다.
+
+---
+
+## 2. 오늘 생성한 패키지 구조
+
+```text
+src/main/java/com/rebook
+├─ Main.java
+├─ domain
+│  ├─ AnswerType.java
+│  ├─ BookConditionResponse.java
+│  ├─ ResponseEvaluationResult.java
+│  └─ BuyDecisionResult.java
+├─ provider
+│  └─ QuestionProvider.java
+├─ service
+│  └─ BuyDecisionService.java
+└─ view
+   ├─ InputView.java
+   └─ OutputView.java
+```
+
+### 패키지별 책임
+
+- `domain`: 판단에 필요한 데이터와 결과 객체를 둔다.
+- `provider`: 질문 목록을 제공한다.
+- `service`: 매입 가능 여부 판단 로직을 담당한다.
+- `view`: 사용자 입력과 화면 출력을 담당한다.
+- `Main`: 전체 객체를 연결하고 실행 흐름을 제어한다.
+
+---
+
+## 3. AnswerType 구현
+
+### 역할
+
+`AnswerType`은 사용자의 답변을 프로그램 내부에서 안전하게 표현하는 enum이다.
+
+### 현재 값
+
+```java
+YES, NO, OTHER
+```
+
+### 현재 구현 기준
+
+```java
+public enum AnswerType {
+    YES, NO, OTHER;
+
+    public static AnswerType fromInput(String input) {
+        return switch (input) {
+            case "1" -> YES;
+            case "2" -> NO;
+            case "3" -> OTHER;
+            default -> null;
+        };
+    }
+}
+```
+
+### 입력 변환 규칙
+
+```text
+1 → YES
+2 → NO
+3 → OTHER
+그 외 입력 → null
+```
+
+### 설계 기준
+
+- 사용자 입력 문자열을 그대로 판단 로직에 넘기지 않는다.
+- 내부에서는 `AnswerType`으로 변환해서 사용한다.
+- 잘못된 입력은 `UNKNOWN`으로 처리하지 않는다.
+- 잘못된 입력은 `InputView`에서 다시 입력받는다.
+- `OTHER`는 사용자가 의도적으로 기타를 선택한 경우에만 사용한다.
+
+---
+
+## 4. InputView 구현
+
+### 역할
+
+`InputView`는 사용자 입력을 담당한다.
+
+### 현재 구현 내용
+
+- `Scanner`를 필드로 한 번 생성해서 재사용한다.
+- `inputBookTitle()`로 책 제목을 입력받는다.
+- `inputAnswer()`로 답변을 입력받는다.
+- 입력 문자열을 `AnswerType.fromInput()`으로 변환한다.
+- 잘못된 입력이면 올바른 입력이 들어올 때까지 다시 입력받는다.
+
+### 현재 구현 기준
+
+```java
+private final Scanner input = new Scanner(System.in);
+
+public String inputBookTitle() {
+    return input.nextLine();
+}
+
+public AnswerType inputAnswer() {
+    AnswerType answerType = AnswerType.fromInput(input.nextLine());
+
+    while (answerType == null) {
+        System.out.println("1,2,3 중 하나를 입력해주세요.");
+        answerType = AnswerType.fromInput(input.nextLine());
+    }
+
+    return answerType;
+}
+```
+
+### 설계 기준
+
+- `InputView`는 입력만 담당한다.
+- `InputView`는 매입 가능 여부를 판단하지 않는다.
+- `InputView`는 `BookConditionResponse`를 직접 만들지 않는다.
+- 잘못된 입력을 `OTHER`로 처리하지 않는다.
+- 현재 콘솔 MVP에서는 잘못된 입력 안내 메시지를 `InputView`에 두지만, 추후 역할 분리를 강화하면 `OutputView`로 옮길 수 있다.
+
+---
+
+## 5. BookConditionResponse 구현
+
+### 역할
+
+`BookConditionResponse`는 질문 1개와 답변 1개를 연결하는 객체다.
+
+### 현재 필드
+
+```java
+private final String question;
+private final AnswerType answerType;
+```
+
+### 설계 기준
+
+- 필드는 `final`로 둔다.
+- 생성 시점에 질문과 답변을 함께 받는다.
+- `BuyDecisionService`가 질문과 답변을 확인할 수 있도록 getter를 제공한다.
+- 1차 MVP에서는 `etcText`를 사용하지 않는다.
+
+---
+
+## 6. ResponseEvaluationResult 구현
+
+### 역할
+
+`ResponseEvaluationResult`는 응답 1개를 평가한 중간 결과 객체다.
+
+### 현재 필드
+
+```java
+private final boolean rejected;
+private final String rejectReason;
+```
+
+### 설계 기준
+
+- 필드는 `final`로 둔다.
+- `rejected = true`이면 현재 응답이 매입불가 조건에 해당한다.
+- `rejected = false`이면 다음 질문으로 진행할 수 있다.
+- 매입불가가 아닐 때 `rejectReason`은 빈 문자열 `""`로 표현한다.
+- 응답 평가 결과는 매입불가 여부와 관계없이 항상 객체로 반환한다.
+
+---
+
+## 7. BuyDecisionResult 구현
+
+### 역할
+
+`BuyDecisionResult`는 최종 매입 가능 여부 판단 결과를 담는 객체다.
+
+### 현재 필드
+
+```java
+private final boolean buyable;
+private final String rejectReason;
+private final String message;
+```
+
+### 설계 기준
+
+- 필드는 `final`로 둔다.
+- 매입 가능 여부는 `buyable`로 구분한다.
+- 매입불가일 경우 `rejectReason`에 단일 사유를 담는다.
+- 매입가능일 경우 `rejectReason`은 빈 문자열 `""`로 둔다.
+- 출력에 필요한 메시지는 `message`에 담는다.
+
+---
+
+## 8. QuestionProvider 구현
+
+### 역할
+
+`QuestionProvider`는 책 상태 질문 목록을 제공한다.
+
+### 현재 질문 목록
+
+```text
+- 2cm 초과의 심한 찢어짐이 있나요?
+- 곰팡이가 있나요?
+- 심한 오염 또는 심한 낙서가 있나요?
+- 물에 젖은 흔적이 있나요?
+- 페이지 누락 또는 제본 불량으로 책이 분리되어 있나요?
+```
+
+### 설계 기준
+
+- 질문 목록은 `Main`에서 직접 관리하지 않는다.
+- 1차 MVP에서는 `List<String>`으로 질문 목록을 제공한다.
+- 질문 목록은 `List.of()`를 사용해 고정 목록으로 관리한다.
+- 추후 질문 ID, 매입불가 사유, 등급 기준 등이 필요해지면 `Question` 객체로 확장할 수 있다.
+
+---
+
+## 9. BuyDecisionService 구현 상태
+
+### 역할
+
+`BuyDecisionService`는 `BookConditionResponse` 하나를 평가한다.
+
+### 현재 구현 상태
+
+현재는 메서드 시그니처와 임시 반환값만 작성했다.
+
+```java
+public ResponseEvaluationResult evaluateResponse(BookConditionResponse bookConditionResponse) {
+    return new ResponseEvaluationResult(false, "");
+}
+```
+
+### 설계 기준
+
+- 사용자 입력을 직접 받지 않는다.
+- 결과를 직접 출력하지 않는다.
+- 반복 흐름을 제어하지 않는다.
+- 응답 1개에 대한 평가만 담당한다.
+- 실제 매입불가 판단 로직은 다음 단계 이후 구현한다.
+
+---
+
+## 10. OutputView 구현 상태
+
+### 역할
+
+`OutputView`는 질문과 최종 결과를 출력한다.
+
+### 현재 메서드 시그니처
+
+```java
+void printQuestion(String question)
+void printResult(BuyDecisionResult result)
+```
+
+### 설계 기준
+
+- 출력만 담당한다.
+- 질문 목록을 직접 만들지 않는다.
+- 매입 가능 여부를 판단하지 않는다.
+- `BuyDecisionResult`를 받아 최종 결과를 출력한다.
+- 다음 과제에서 실제 출력 내용을 구현한다.
+
+---
+
+## 11. Main 구현 상태
+
+### 현재 상태
+
+`Main`은 아직 전체 흐름을 연결하지 않고, 실행 확인과 흐름 주석만 작성했다.
+
+### 현재 흐름 주석
+
+```text
+1. 책 제목 입력
+2. 책 질문 목록 가져오기
+3. 질문 반복
+4. 질문 출력
+5. 답변 입력
+6. BookConditionResponse 생성
+7. BuyDecisionService로 응답 평가
+8. rejected == true이면 BuyDecisionResult 생성 후 break
+9. 모든 질문 통과 시 매입 가능 BuyDecisionResult 생성
+10. 결과 출력
+```
+
+### 설계 기준
+
+- `Main`은 전체 흐름을 조립한다.
+- 직접 입력 로직을 작성하지 않는다.
+- 직접 출력 문구를 복잡하게 작성하지 않는다.
+- 직접 판단 조건을 가지지 않는다.
+- 다음 단계에서 객체 생성과 흐름 연결을 구현한다.
+
+---
+
+## 12. 오늘 결정한 핵심 구현 기준
+
+- `AnswerType`은 `YES`, `NO`, `OTHER`만 사용한다.
+- 잘못된 입력은 `UNKNOWN`으로 처리하지 않는다.
+- 사용자 입력 문자열은 `AnswerType.fromInput()`으로 변환한다.
+- `fromInput()`은 변환만 담당한다.
+- 다시 입력받는 반복 흐름은 `InputView`가 담당한다.
+- `Scanner`는 `InputView`의 필드로 한 번 생성해서 재사용한다.
+- `InputView`는 `BookConditionResponse`를 만들지 않는다.
+- `BuyDecisionService`는 아직 실제 판단 로직을 구현하지 않는다.
+- `OutputView`는 다음 과제에서 실제 출력 기능을 구현한다.
+- `Main`은 다음 과제에서 전체 흐름 연결을 준비한다.
+
+---
+
+## 13. 다음 과제에서 할 일
+
+### 다음 과제명
+
+1단계 7일차 - `OutputView` 출력 기능 구현 및 `Main` 흐름 연결 준비
+
+### 다음 과제 범위
+
+- `OutputView.printQuestion(String question)` 구현
+- `OutputView.printResult(BuyDecisionResult result)` 구현
+- `InputView`의 잘못된 입력 안내 메시지를 계속 유지할지, `OutputView`로 분리할지 검토
+- `Main`에서 객체 생성 흐름 준비
+- `Main`에서 질문 목록 조회, 질문 반복, 답변 입력 흐름을 연결할 준비
+
+### 다음 과제 전 설계 질문
+
+- `OutputView`는 단순히 출력만 담당해야 할까?
+- `OutputView`가 `BuyDecisionResult`의 상태를 보고 출력 문구를 선택해도 될까?
+- 잘못된 입력 안내 메시지는 `InputView`에 남겨둘까, `OutputView`로 분리할까?
+- `Main`은 객체 생성과 흐름 제어를 어디까지 담당해야 할까?
+- `BuyDecisionResult`는 생성자로 직접 만들까, 정적 팩토리 메서드를 둘까?
+
+---

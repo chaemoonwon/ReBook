@@ -1610,3 +1610,244 @@ if (finalResult == null) {
 - 1차 MVP에서는 문자열 기반 판단이 허용될까?
 - `AnswerType.YES`일 때만 매입불가 조건으로 볼 수 있을까?
 - 매입불가 사유 문자열은 어디에서 관리하는 것이 좋을까?
+
+---
+
+# 1단계 8일차 - BuyDecisionService 실제 매입불가 판단 로직 구현
+
+## 1. 오늘 과제 목적
+
+1단계 8일차 과제에서는 `BuyDecisionService`가 실제로 매입불가 여부를 판단하도록 구현했다.
+
+이전 단계까지는 `Main`에서 질문 반복, 답변 입력, `BookConditionResponse` 생성, `BuyDecisionService.evaluateResponse()` 호출, 최종 결과 출력 흐름까지 연결했다.
+
+이번 단계의 핵심은 `evaluateResponse()` 내부에서 응답 1개를 평가하고, 매입불가 여부와 사유를 `ResponseEvaluationResult`로 반환하는 것이다.
+
+---
+
+## 2. 오늘 구현한 메서드
+
+```java
+public ResponseEvaluationResult evaluateResponse(BookConditionResponse response)
+```
+
+이 메서드는 사용자의 응답 1개를 평가한다.
+
+### 입력
+
+```java
+BookConditionResponse response
+```
+
+`BookConditionResponse`는 질문 1개와 답변 1개를 함께 가진다.
+
+```text
+question
+answerType
+```
+
+### 출력
+
+```java
+ResponseEvaluationResult
+```
+
+`ResponseEvaluationResult`는 응답 1개에 대한 평가 결과를 나타낸다.
+
+```text
+rejected
+rejectReason
+```
+
+---
+
+## 3. 기본 판단 흐름
+
+`evaluateResponse()`의 기본 판단 흐름은 다음과 같다.
+
+```text
+1. answerType이 YES가 아니면 rejected=false 반환
+2. answerType이 YES이면 질문 문자열을 확인
+3. 질문 내용에 맞는 매입불가 사유 결정
+4. 매입불가 조건에 해당하면 rejected=true 반환
+5. 어떤 조건에도 걸리지 않으면 rejected=false 반환
+```
+
+---
+
+## 4. YES가 아닌 답변 처리
+
+현재 1차 MVP에서는 `AnswerType.NO`와 `AnswerType.OTHER`를 매입불가로 보지 않는다.
+
+따라서 `YES`가 아닌 답변은 즉시 통과 처리한다.
+
+```java
+if (response.getAnswerType() != AnswerType.YES) {
+    return new ResponseEvaluationResult(false, "");
+}
+```
+
+### 설계 기준
+
+- `YES`는 매입불가 조건에 해당할 가능성이 있다.
+- `NO`는 현재 질문에 해당 사항이 없다는 의미이므로 통과한다.
+- `OTHER`는 1차 MVP에서는 별도 보류 처리하지 않고 통과한다.
+- 추후에는 `OTHER`에 대해 추가 설명 입력 또는 보류 상태를 도입할 수 있다.
+
+---
+
+## 5. 질문 문자열 기반 매입불가 판단
+
+현재 1차 MVP에서는 별도의 `Question` 객체나 `questionId`를 사용하지 않는다.
+
+따라서 질문 문자열에 포함된 핵심 단어를 기준으로 매입불가 사유를 결정한다.
+
+### 찢어짐 조건
+
+```java
+if (response.getQuestion().contains("찢어짐")) {
+    return new ResponseEvaluationResult(true, "2cm 초과의 심한 찢어짐이 있어 매입할 수 없습니다.");
+}
+```
+
+### 곰팡이 조건
+
+```java
+else if (response.getQuestion().contains("곰팡이")) {
+    return new ResponseEvaluationResult(true, "곰팡이가 있어 매입할 수 없습니다.");
+}
+```
+
+### 오염 또는 낙서 조건
+
+```java
+else if (response.getQuestion().contains("오염")
+        || response.getQuestion().contains("낙서")) {
+    return new ResponseEvaluationResult(true, "심한 오염 또는 심한 낙서가 있어 매입할 수 없습니다.");
+}
+```
+
+### 물에 젖은 흔적 조건
+
+```java
+else if (response.getQuestion().contains("물")
+        || response.getQuestion().contains("젖은")) {
+    return new ResponseEvaluationResult(true, "물에 젖은 흔적이 있어 매입할 수 없습니다.");
+}
+```
+
+### 페이지 누락 또는 제본 불량 조건
+
+```java
+else if (response.getQuestion().contains("페이지 누락")
+        || response.getQuestion().contains("제본 불량")
+        || response.getQuestion().contains("분리")) {
+    return new ResponseEvaluationResult(true, "페이지 누락 또는 제본 불량으로 책이 분리되어 매입할 수 없습니다.");
+}
+```
+
+---
+
+## 6. 기본 통과 처리
+
+`YES` 답변이 들어왔더라도 어떤 매입불가 조건에도 매칭되지 않으면 통과 처리한다.
+
+```java
+return new ResponseEvaluationResult(false, "");
+```
+
+현재 질문 목록이 모두 매입불가 조건 질문이기 때문에 일반적으로는 이 코드까지 도달하지 않는다.
+
+다만 예외적인 질문이 추가되거나, 질문 문자열이 변경될 가능성을 대비해 기본 반환값을 둔다.
+
+---
+
+## 7. 오늘 결정한 핵심 설계 기준
+
+- `BuyDecisionService`는 입력을 직접 받지 않는다.
+- `BuyDecisionService`는 결과를 직접 출력하지 않는다.
+- `BuyDecisionService`는 `BookConditionResponse` 하나를 평가한다.
+- `BuyDecisionService`는 `ResponseEvaluationResult`를 반환한다.
+- 현재 질문 목록은 모두 매입불가 조건 질문이다.
+- `AnswerType.YES`이면 질문 문자열을 기준으로 매입불가 여부를 판단한다.
+- `AnswerType.NO`와 `AnswerType.OTHER`는 현재 1차 MVP에서는 통과 처리한다.
+- 매입불가 사유 문자열은 현재 단계에서는 `BuyDecisionService` 안에서 관리한다.
+- 질문 문자열 판단은 1차 MVP에서는 허용하지만, 추후 개선 대상이다.
+
+---
+
+## 8. 현재 방식의 장점과 한계
+
+### 장점
+
+- 구현이 단순하다.
+- 현재 MVP 범위에 적합하다.
+- `Question` 객체를 추가하지 않아도 빠르게 동작 흐름을 완성할 수 있다.
+- `Main`과 `View`의 책임을 침범하지 않는다.
+
+### 한계
+
+- 질문 문장이 바뀌면 `contains()` 조건이 깨질 수 있다.
+- 매입불가 사유가 `BuyDecisionService` 안에 직접 들어 있어 조건이 많아질수록 코드가 길어진다.
+- 질문과 사유의 관계가 한 곳에서 명확하게 관리되지 않는다.
+- 추후 상태 등급, 예상 가격, 보류 상태 등이 추가되면 현재 구조만으로는 부족할 수 있다.
+
+---
+
+## 9. 추후 개선 후보
+
+추후에는 아래 방식으로 개선할 수 있다.
+
+### Question 객체 도입
+
+```text
+Question
+- id
+- content
+- rejectReason
+```
+
+질문 문장과 매입불가 사유를 함께 관리할 수 있다.
+
+### enum 기반 질문 타입 도입
+
+```text
+BookConditionQuestion
+- TORN
+- MOLD
+- POLLUTION
+- WET
+- PAGE_MISSING
+```
+
+문자열 비교 대신 고정된 타입으로 판단할 수 있다.
+
+### 정적 팩토리 메서드 도입
+
+`ResponseEvaluationResult` 생성 코드를 더 명확하게 만들 수 있다.
+
+```java
+ResponseEvaluationResult.rejected("곰팡이가 있어 매입할 수 없습니다.");
+ResponseEvaluationResult.passed();
+```
+
+---
+
+## 10. 다음 과제에서 할 일
+
+다음 과제에서는 전체 콘솔 실행 흐름을 테스트한다.
+
+### 다음 과제명
+
+1단계 9일차 - 전체 실행 흐름 테스트 및 콘솔 시나리오 점검
+
+### 다음 과제 범위
+
+- 모든 질문에 `2. 아니오` 입력 시 매입 가능 결과가 나오는지 확인
+- 첫 번째 질문에 `1. 예` 입력 시 즉시 매입불가로 종료되는지 확인
+- 곰팡이 질문에 `1. 예` 입력 시 곰팡이 사유가 출력되는지 확인
+- 오염/낙서 질문에 `1. 예` 입력 시 해당 사유가 출력되는지 확인
+- 물에 젖은 흔적 질문에 `1. 예` 입력 시 해당 사유가 출력되는지 확인
+- 페이지 누락/제본 불량 질문에 `1. 예` 입력 시 해당 사유가 출력되는지 확인
+- 잘못된 입력 시 다시 입력받는지 확인
+- `3. 기타` 입력 시 현재 MVP 기준으로 통과 처리되는지 확인

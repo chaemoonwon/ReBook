@@ -17,6 +17,7 @@ public class Main {
 
         //1. 책 제목 입력
         InputView inputView = new InputView();
+        System.out.println("책 제목을 입력하세요.");
         String title = inputView.inputBookTitle();
         System.out.println("책 제목: " + title);
         //2. 책 질문 목록 가져오기

@@ -1329,3 +1329,284 @@ void printResult(BuyDecisionResult result)
 - `BuyDecisionResult`는 생성자로 직접 만들까, 정적 팩토리 메서드를 둘까?
 
 ---
+
+
+# 1단계 7일차 - OutputView 출력 기능 구현 및 Main 흐름 연결 준비
+
+## 1. 오늘 과제 목적
+
+1단계 7일차 과제에서는 `OutputView`의 출력 기능을 구현하고, `Main`에서 전체 실행 흐름을 연결했다.
+
+이번 단계의 핵심은 전체 판단 로직을 완성하는 것이 아니라, 지금까지 설계한 객체들을 실제 실행 흐름 안에서 연결하는 것이다.
+
+특히 `Main`은 직접 매입불가 조건을 판단하지 않고, `BuyDecisionService`가 반환한 `ResponseEvaluationResult`를 보고 반복을 계속할지 종료할지만 결정하도록 설계했다.
+
+---
+
+## 2. OutputView 구현
+
+### 역할
+
+`OutputView`는 콘솔 화면에 질문과 최종 결과를 출력하는 객체다.
+
+### 구현한 메서드
+
+```java
+void printQuestion(String question)
+void printResult(BuyDecisionResult result)
+```
+
+---
+
+## 3. printQuestion(String question) 구현
+
+### 역할
+
+`printQuestion(String question)`은 사용자에게 책 상태 질문을 출력한다.
+
+### 출력 형태
+
+```text
+책에 곰팡이가 있나요?
+1. 예
+2. 아니오
+3. 기타
+```
+
+### 설계 기준
+
+- `OutputView`는 질문을 출력한다.
+- 질문마다 답변 선택지를 함께 출력한다.
+- 질문 목록을 직접 만들지 않는다.
+- 사용자 입력을 받지 않는다.
+- 매입 가능 여부를 판단하지 않는다.
+- 선택지를 매번 출력해서 사용자가 입력 규칙을 잊지 않도록 한다.
+
+---
+
+## 4. printResult(BuyDecisionResult result) 구현
+
+### 역할
+
+`printResult(BuyDecisionResult result)`는 최종 매입 가능 여부 결과를 출력한다.
+
+### 출력 기준
+
+최종 결과 메시지는 항상 출력한다.
+
+```java
+System.out.println(result.getMessage());
+```
+
+매입불가 결과일 경우에는 매입불가 사유도 함께 출력한다.
+
+```java
+if (!result.isBuyable()) {
+    System.out.println("사유: " + result.getRejectReason());
+}
+```
+
+### 매입불가 출력 예시
+
+```text
+매입할 수 없습니다.
+사유: 곰팡이가 있어 매입할 수 없습니다.
+```
+
+### 설계 기준
+
+- `OutputView`는 `BuyDecisionResult`를 화면에 보여준다.
+- `message`는 항상 출력한다.
+- `buyable == false`인 경우에만 `rejectReason`을 출력한다.
+- 이 조건문은 매입 판단 로직이 아니라 출력 형식 결정이다.
+- 실제 매입 가능 여부 판단은 `BuyDecisionService`가 담당한다.
+
+---
+
+## 5. Main 흐름 연결
+
+### 현재 연결된 흐름
+
+```text
+ReBook 콘솔 MVP 시작
+→ 책 제목 입력
+→ 질문 목록 조회
+→ 질문 반복
+→ 질문 출력
+→ 답변 입력
+→ BookConditionResponse 생성
+→ BuyDecisionService.evaluateResponse() 호출
+→ rejected이면 매입불가 BuyDecisionResult 생성 후 반복 종료
+→ 모든 질문 통과 시 매입 가능 BuyDecisionResult 생성
+→ OutputView가 최종 결과 출력
+```
+
+---
+
+## 6. Main의 책임
+
+`Main`은 전체 흐름을 조립한다.
+
+### 담당하는 일
+
+- `InputView` 생성
+- `OutputView` 생성
+- `QuestionProvider` 생성
+- `BuyDecisionService` 생성
+- 책 제목 입력 호출
+- 질문 목록 조회
+- 질문 반복
+- `OutputView.printQuestion(question)` 호출
+- `InputView.inputAnswer()` 호출
+- `BookConditionResponse` 생성
+- `BuyDecisionService.evaluateResponse(response)` 호출
+- `ResponseEvaluationResult`를 보고 반복 종료 여부 결정
+- 최종 `BuyDecisionResult` 생성
+- `OutputView.printResult(finalResult)` 호출
+
+### 담당하지 않는 일
+
+- 직접 사용자 입력을 받지 않는다.
+- 직접 질문 목록을 만들지 않는다.
+- 직접 매입불가 조건을 판단하지 않는다.
+- 직접 결과 출력 문구를 복잡하게 관리하지 않는다.
+- 매입불가 사유를 여러 개 누적하지 않는다.
+
+---
+
+## 7. Main에서 BuyDecisionResult 생성 시점
+
+### 매입불가 결과 생성
+
+질문 반복 중 `BuyDecisionService`가 반환한 `ResponseEvaluationResult`가 매입불가 상태이면 즉시 최종 결과를 생성하고 반복을 종료한다.
+
+```java
+if (evaluationResult.isRejected()) {
+    finalResult = new BuyDecisionResult(
+            false,
+            evaluationResult.getRejectReason(),
+            "매입할 수 없습니다."
+    );
+    break;
+}
+```
+
+### 매입 가능 결과 생성
+
+매입 가능 결과는 질문 하나를 통과했다고 바로 생성하지 않는다.
+
+모든 질문을 끝까지 통과한 뒤, 즉 `for` 반복문이 끝난 뒤에 생성한다.
+
+```java
+if (finalResult == null) {
+    finalResult = new BuyDecisionResult(
+            true,
+            "",
+            "매입 가능합니다."
+    );
+}
+```
+
+### 설계 기준
+
+- 매입불가 결과는 매입불가 조건이 발견된 즉시 생성한다.
+- 매입 가능 결과는 모든 질문을 통과한 뒤 생성한다.
+- 최종 결과 출력은 질문 반복이 끝난 뒤 한 번만 수행한다.
+- `Main`은 매입불가 조건 자체를 직접 판단하지 않는다.
+- `Main`은 `ResponseEvaluationResult.isRejected()`만 보고 흐름을 제어한다.
+
+---
+
+## 8. 오늘 결정한 핵심 설계 기준
+
+- 질문과 선택지는 `OutputView.printQuestion()`에서 함께 출력한다.
+- 최종 결과는 `OutputView.printResult()`에서 출력한다.
+- 매입불가 사유는 매입불가 결과일 때만 출력한다.
+- `OutputView`의 조건문은 판단 로직이 아니라 출력 형식 결정으로 본다.
+- `Main`은 `BuyDecisionService`의 평가 결과만 보고 흐름을 제어한다.
+- `Main`은 직접 매입불가 조건을 판단하지 않는다.
+- 매입 가능 결과는 모든 질문을 통과한 뒤 생성한다.
+- 최종 결과 출력은 질문 반복이 끝난 뒤 한 번만 수행한다.
+- `BuyDecisionService`는 반복문 안에서 매번 생성하지 않고 한 번만 생성해 재사용한다.
+- 책 제목 입력값은 변수에 저장한다.
+- 현재 단계에서는 `Main`에서 `BuyDecisionResult`를 직접 생성한다.
+- 정적 팩토리 메서드는 결과 생성 로직이 복잡해지는 시점에 도입을 고려한다.
+
+---
+
+## 9. 현재까지의 객체 책임 정리
+
+### InputView
+
+- 책 제목을 입력받는다.
+- 책 상태 질문에 대한 답변을 입력받는다.
+- 사용자 입력 문자열을 `AnswerType`으로 변환한다.
+- 잘못된 입력이면 다시 입력받는다.
+- 매입 가능 여부를 판단하지 않는다.
+
+### OutputView
+
+- 질문을 출력한다.
+- 답변 선택지를 출력한다.
+- 최종 결과 메시지를 출력한다.
+- 매입불가일 경우 매입불가 사유를 출력한다.
+- 매입 가능 여부 자체를 판단하지 않는다.
+
+### QuestionProvider
+
+- 책 상태 질문 목록을 제공한다.
+- 질문 목록을 `Main`에서 직접 관리하지 않도록 분리한다.
+
+### BuyDecisionService
+
+- `BookConditionResponse` 하나를 평가한다.
+- 해당 응답이 매입불가 조건인지 판단한다.
+- `ResponseEvaluationResult`를 반환한다.
+- 입력과 출력은 담당하지 않는다.
+- 반복 흐름 제어는 담당하지 않는다.
+
+### Main
+
+- 전체 실행 흐름을 연결한다.
+- 질문 반복을 제어한다.
+- 입력, 출력, 판단 객체를 연결한다.
+- `ResponseEvaluationResult`를 보고 반복 종료 여부를 결정한다.
+- 최종 `BuyDecisionResult`를 생성한다.
+- 직접 매입불가 조건을 판단하지 않는다.
+
+---
+
+## 10. 현재 단계에서 남은 개선 후보
+
+- `Main`에서 책 제목을 출력하는 부분은 추후 `OutputView`로 옮길 수 있다.
+- `OutputView.printResult()` 앞뒤에 빈 줄을 넣어 콘솔 가독성을 높일 수 있다.
+- `Main`의 흐름 주석은 학습 단계에서는 유지하고, 추후 코드가 안정되면 줄일 수 있다.
+- `BuyDecisionResult` 생성 코드가 복잡해지면 정적 팩토리 메서드를 고려할 수 있다.
+- `finalResult == null` 방식은 현재 단계에서는 적절하지만, 추후 결과 흐름이 복잡해지면 별도 결과 생성 객체로 분리할 수 있다.
+
+---
+
+## 11. 다음 과제에서 할 일
+
+다음 과제에서는 `BuyDecisionService`의 실제 매입불가 판단 로직을 구현한다.
+
+### 다음 과제명
+
+1단계 8일차 - `BuyDecisionService` 실제 매입불가 판단 로직 구현
+
+### 다음 과제 범위
+
+- `BuyDecisionService.evaluateResponse(BookConditionResponse response)` 실제 구현
+- `AnswerType.YES` 답변일 때 매입불가 조건으로 판단할지 검토
+- 질문 문자열 기반 판단을 사용할지 검토
+- 매입불가 사유 문자열 관리 위치 결정
+- `ResponseEvaluationResult(true, reason)` 반환 흐름 구현
+- 매입불가가 아닐 때 `ResponseEvaluationResult(false, "")` 반환 흐름 유지
+
+### 다음 과제 전 생각할 질문
+
+- `BuyDecisionService`는 질문 문자열을 보고 판단해야 할까?
+- 질문마다 고유한 식별자나 조건 정보를 가진 객체가 필요할까?
+- 1차 MVP에서는 문자열 기반 판단이 허용될까?
+- `AnswerType.YES`일 때만 매입불가 조건으로 볼 수 있을까?
+- 매입불가 사유 문자열은 어디에서 관리하는 것이 좋을까?

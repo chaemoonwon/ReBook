@@ -1966,3 +1966,111 @@ ResponseEvaluationResult.passed();
 - `QuestionProvider` 구조 개선 필요성 검토
 - `OTHER` 답변 처리 방식 재검토
 - 수동 테스트를 자동 테스트로 바꿀 시점 검토
+
+---
+
+# 1단계 10일차 - 1차 콘솔 MVP 구조 리팩터링 후보 점검
+
+## 1. 오늘 과제 목적
+
+1단계 10일차 과제에서는 현재까지 구현한 1차 콘솔 MVP 구조를 점검하고, 리팩터링 후보를 분류했다.
+
+이번 단계의 핵심은 코드를 바로 수정하는 것이 아니라, 지금 바로 고쳐야 할 부분과 나중에 미뤄도 되는 부분을 구분하는 것이다.
+
+---
+
+## 2. 현재 콘솔 MVP 상태
+
+현재 콘솔 MVP는 아래 흐름까지 동작한다.
+
+```text
+책 제목 입력
+→ 질문 출력
+→ 답변 입력
+→ BookConditionResponse 생성
+→ BuyDecisionService가 응답 평가
+→ 매입불가이면 즉시 종료
+→ 모든 질문 통과 시 매입 가능 결과 출력
+```
+
+이전 테스트에서 정상 흐름, 매입불가 즉시 종료, 기타 입력, 잘못된 입력 재입력 처리가 모두 통과했다.
+
+---
+
+## 3. 리팩터링 후보 정리
+
+| 리팩터링 후보 | 현재 문제 | 지금 수정 여부 | 이유 | 다음 액션 |
+|---|---|---|---|---|
+| `BuyDecisionService` 문자열 `contains()` 판단 | 질문 문장이 바뀌면 판단 로직이 깨질 수 있음 | 다음 과제에서 수정 | 질문과 사유가 이미 연결되어 있으므로 구조 개선 필요 | `BookConditionQuestion` 객체 도입 |
+| `QuestionProvider`의 `List<String>` 구조 | 질문과 매입불가 사유가 분리되어 있음 | 다음 과제에서 수정 | 질문과 사유를 한 객체로 묶으면 Service가 단순해짐 | `List<BookConditionQuestion>` 반환 구조 검토 |
+| `ResponseEvaluationResult(false, "")` | 빈 문자열이 의미를 명확히 드러내지는 않음 | 지금은 유지 | 1차 MVP에서는 매입불가 아님을 표현하기에 충분함 | 추후 `passed()`, `rejected(reason)` 정적 팩토리 검토 |
+| `OTHER` 통과 처리 | 기타 답변이 실제로는 애매한 상태일 수 있음 | 지금은 유지 | 1차 MVP는 매입불가 여부만 판단하므로 범위 밖 | 추후 추가 설명 입력 또는 보류 상태 검토 |
+| 수동 콘솔 테스트 | 사람이 직접 입력해야 해서 반복이 어려움 | 지금은 유지 | 구조 리팩터링 후 단위 테스트를 도입하는 게 효율적 | `BuyDecisionService`부터 JUnit 테스트 도입 |
+| `Main`에서 `BuyDecisionResult` 직접 생성 | 결과 생성 책임이 Main에 일부 있음 | 지금은 유지 | 현재 흐름이 단순하고 학습 단계에서는 명확함 | 추후 정적 팩토리 또는 결과 생성 메서드 검토 |
+
+---
+
+## 4. 다음 과제에서 수정할 것
+
+다음 과제에서는 아래 항목을 실제로 수정한다.
+
+```text
+1. BookConditionQuestion 객체 도입
+2. QuestionProvider가 List<BookConditionQuestion>을 반환하도록 변경
+3. BookConditionResponse가 String question 대신 BookConditionQuestion을 가지도록 검토
+4. BuyDecisionService에서 contains() 판단 제거
+5. YES이면 question.getRejectReason()으로 매입불가 결과 반환
+```
+
+---
+
+## 5. 지금은 유지할 것
+
+아래 항목은 현재 1차 MVP에서는 유지한다.
+
+```text
+1. ResponseEvaluationResult(false, "")
+2. OTHER 통과 처리
+3. Main에서 BuyDecisionResult 직접 생성
+4. 수동 테스트 방식
+```
+
+---
+
+## 6. 나중에 검토할 것
+
+아래 항목은 다음 단계 이후에 검토한다.
+
+```text
+1. ResponseEvaluationResult 정적 팩토리 메서드
+2. OTHER 추가 설명 입력
+3. 상태 등급 판정
+4. JUnit 자동 테스트
+5. Question enum화
+```
+
+---
+
+## 7. 오늘 결정한 핵심 설계 기준
+
+- 질문과 매입불가 사유는 함께 변하는 데이터다.
+- 함께 변하는 데이터는 하나의 객체로 묶는 것이 좋다.
+- `BuyDecisionService`가 질문 문자열을 직접 해석하는 구조는 개선 대상이다.
+- 하지만 모든 개선을 한 번에 적용하지 않는다.
+- 다음 리팩터링의 중심은 `BookConditionQuestion` 도입이다.
+
+---
+
+## 8. 다음 과제에서 할 일
+
+### 다음 과제명
+
+1단계 11일차 - `BookConditionQuestion` 도입을 통한 질문/사유 구조 리팩터링
+
+### 다음 과제 범위
+
+- `BookConditionQuestion` 클래스 설계
+- 질문 문장과 매입불가 사유를 하나의 객체로 묶기
+- `QuestionProvider` 반환 타입 변경 검토
+- `BookConditionResponse` 구조 변경 검토
+- `BuyDecisionService`에서 문자열 `contains()` 판단 제거 검토

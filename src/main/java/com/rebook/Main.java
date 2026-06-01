@@ -1,9 +1,6 @@
 package com.rebook;
 
-import com.rebook.domain.AnswerType;
-import com.rebook.domain.BookConditionResponse;
-import com.rebook.domain.BuyDecisionResult;
-import com.rebook.domain.ResponseEvaluationResult;
+import com.rebook.domain.*;
 import com.rebook.provider.QuestionProvider;
 import com.rebook.service.BuyDecisionService;
 import com.rebook.view.InputView;
@@ -22,15 +19,15 @@ public class Main {
         System.out.println("책 제목: " + title);
         //2. 책 질문 목록 가져오기
         QuestionProvider provider = new QuestionProvider();
-        List<String> questions = provider.getQuestions();
+        List<BookConditionQuestion> questions = provider.getQuestions();
         OutputView outputView = new OutputView();
         BuyDecisionService service = new BuyDecisionService();
 
         BuyDecisionResult finalResult = null;
         //3. 질문 반복
-        for (String question : questions) {
+        for (BookConditionQuestion question : questions) {
             //4. 질문 출력
-            outputView.printQuestion(question);
+            outputView.printQuestion(question.getContent());
             //5. 답변 입력
             AnswerType answerType = inputView.inputAnswer();
             //6. BookConditionResponse 생성

@@ -1,15 +1,15 @@
 package com.rebook.domain;
 
 public class BookConditionResponse {
-    private final String question;
+    private final BookConditionQuestion question;
     private final AnswerType answerType;
 
-    public BookConditionResponse(String question, AnswerType answerType) {
+    public BookConditionResponse(BookConditionQuestion question, AnswerType answerType) {
         this.question = question;
         this.answerType = answerType;
     }
 
-    public String getQuestion() {
+    public BookConditionQuestion getQuestion() {
         return question;
     }
 

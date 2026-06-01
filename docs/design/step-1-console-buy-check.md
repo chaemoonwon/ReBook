@@ -2074,3 +2074,155 @@ ResponseEvaluationResult.passed();
 - `QuestionProvider` 반환 타입 변경 검토
 - `BookConditionResponse` 구조 변경 검토
 - `BuyDecisionService`에서 문자열 `contains()` 판단 제거 검토
+
+---
+
+# 1단계 11일차 - BookConditionQuestion 도입을 통한 질문/사유 구조 리팩터링
+
+## 1. 오늘 과제 목적
+
+1단계 11일차 과제에서는 질문 문장과 매입불가 사유를 하나의 객체로 묶는 리팩터링을 진행했다.
+
+기존 구조에서는 `QuestionProvider`가 질문 문장만 제공하고, `BuyDecisionService`가 질문 문자열을 분석해 매입불가 사유를 결정했다.
+
+이 방식은 질문 문장이 바뀌면 Service의 조건문도 함께 바뀌어야 한다는 문제가 있었다.
+
+---
+
+## 2. 기존 구조의 문제
+
+기존 구조는 다음과 같았다.
+
+```text
+QuestionProvider
+→ 질문 문장만 제공
+
+BuyDecisionService
+→ 질문 문자열 contains()로 분석
+→ 매입불가 사유 결정
+```
+
+이 구조의 문제는 다음과 같다.
+
+```text
+1. 질문 문장과 매입불가 사유가 분리되어 있다.
+2. 질문 문장이 바뀌면 Service의 조건문도 같이 수정해야 한다.
+3. BuyDecisionService가 판단뿐 아니라 질문 문장 해석까지 담당한다.
+```
+
+---
+
+## 3. 개선 후 구조
+
+개선 후 구조는 다음과 같다.
+
+```text
+BookConditionQuestion
+→ 질문 문장
+→ 매입불가 사유
+
+QuestionProvider
+→ List<BookConditionQuestion> 제공
+
+BookConditionResponse
+→ BookConditionQuestion + AnswerType
+
+BuyDecisionService
+→ YES인지 확인
+→ YES이면 질문 객체의 매입불가 사유로 결과 반환
+```
+
+---
+
+## 4. 변경된 객체 책임
+
+### BookConditionQuestion
+
+```text
+책 상태 질문 하나를 표현한다.
+질문 문장과, 해당 질문이 YES일 때의 매입불가 사유를 가진다.
+```
+
+### QuestionProvider
+
+```text
+BookConditionQuestion 목록을 제공한다.
+질문 문장과 매입불가 사유의 관계를 한 곳에서 관리한다.
+```
+
+### BookConditionResponse
+
+```text
+사용자의 응답 하나를 표현한다.
+어떤 질문에 대해 어떤 답변을 했는지 가진다.
+```
+
+### BuyDecisionService
+
+```text
+사용자 응답을 평가한다.
+YES가 아니면 통과 결과를 반환한다.
+YES이면 질문 객체의 매입불가 사유로 매입불가 결과를 반환한다.
+질문 문자열을 직접 분석하지 않는다.
+```
+
+### Main
+
+```text
+QuestionProvider에서 질문 객체 목록을 가져온다.
+질문 문장만 OutputView에 전달한다.
+질문 객체와 답변을 BookConditionResponse로 묶어 Service에 전달한다.
+```
+
+---
+
+## 5. 테스트 결과
+
+| 번호 | 테스트 시나리오 | 입력값 | 기대 결과 | 실제 결과 | 통과 여부 | 수정 필요 여부 |
+|---|---|---|---|---|---|---|
+| 1 | 모든 질문 통과 | 2, 2, 2, 2, 2 | 매입 가능합니다. | 매입 가능합니다. | O | X |
+| 2 | 첫 번째 질문에서 매입불가 | 1 | 찢어짐 사유와 함께 매입불가 출력 | 2cm 초과의 심한 찢어짐이 있어 매입할 수 없습니다. | O | X |
+| 3 | 곰팡이 질문에서 매입불가 | 2, 1 | 곰팡이 사유와 함께 매입불가 출력 | 곰팡이가 있어 매입할 수 없습니다. | O | X |
+| 4 | 오염/낙서 질문에서 매입불가 | 2, 2, 1 | 오염/낙서 사유와 함께 매입불가 출력 | 심한 오염 또는 심한 낙서가 있어 매입할 수 없습니다. | O | X |
+| 5 | 물/젖은 흔적 질문에서 매입불가 | 2, 2, 2, 1 | 물에 젖은 흔적 사유와 함께 매입불가 출력 | 물에 젖은 흔적이 있어 매입할 수 없습니다. | O | X |
+| 6 | 페이지 누락/제본 불량 질문에서 매입불가 | 2, 2, 2, 2, 1 | 페이지 누락/제본 불량 사유와 함께 매입불가 출력 | 페이지 누락 또는 제본 불량으로 책이 분리되어 매입할 수 없습니다. | O | X |
+| 7 | 기타 입력 처리 | 3, 3, 3, 3, 3 | 매입 가능합니다. | 매입 가능합니다. | O | X |
+| 8 | 잘못된 입력 처리 | 5 → abc → 2 | 재입력 메시지 출력 후 정상 입력 처리 | 매입 가능합니다. | O | X |
+
+---
+
+## 6. 오늘 결정한 핵심 기준
+
+```text
+질문 문장과 매입불가 사유는 함께 변한다.
+함께 변하는 데이터는 BookConditionQuestion으로 묶는다.
+BuyDecisionService는 질문 문자열을 분석하지 않는다.
+BuyDecisionService는 사용자의 답변이 YES인지 확인하고 결과를 반환한다.
+```
+
+---
+
+## 7. 현재 남은 개선 후보
+
+```text
+1. rejectedReason → rejectReason으로 용어 통일
+2. BookConditionQuestion 생성자 파라미터 question → content로 이름 통일
+3. ResponseEvaluationResult(false, "")를 정적 팩토리 메서드로 개선
+4. BuyDecisionService 단위 테스트 도입
+5. QuestionProvider의 질문 목록 관리 방식 개선 검토
+```
+
+---
+
+## 8. 다음 과제에서 할 일
+
+### 다음 과제명
+
+1단계 12일차 - BuyDecisionService 단위 테스트 설계 준비
+
+### 다음 과제 범위
+
+- BuyDecisionService의 테스트 대상 흐름 정리
+- YES / NO / OTHER 응답별 기대 결과 정리
+- 질문 객체의 매입불가 사유가 결과에 담기는지 확인할 테스트 설계
+- JUnit 도입 전 테스트 케이스 표 작성

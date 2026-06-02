@@ -2226,3 +2226,25 @@ BuyDecisionService는 사용자의 답변이 YES인지 확인하고 결과를 �
 - YES / NO / OTHER 응답별 기대 결과 정리
 - 질문 객체의 매입불가 사유가 결과에 담기는지 확인할 테스트 설계
 - JUnit 도입 전 테스트 케이스 표 작성
+
+---
+
+# 1단계 12일차 - BuyDecisionService 단위 테스트 설계 준비
+
+## 1. 오늘 과제 목적
+
+1단계 12일차 과제에서는 `BuyDecisionService`의 단위 테스트를 작성하기 전에 테스트 설계를 먼저 진행했다.
+
+이번 단계의 핵심은 JUnit 코드를 바로 작성하는 것이 아니라, 어떤 입력을 만들고 어떤 결과를 검증해야 하는지 정리하는 것이다.
+
+---
+
+## 2. 현재 BuyDecisionService의 책임
+
+현재 `BuyDecisionService`는 다음 책임을 가진다.
+
+```text
+BookConditionResponse를 받는다.
+AnswerType이 YES인지 확인한다.
+YES가 아니면 통과 결과를 반환한다.
+YES이면 질문 객체의 매입불가 사유를 담아 rejected 결과를 반환한다.

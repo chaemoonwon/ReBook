@@ -2248,3 +2248,20 @@ BookConditionResponse를 받는다.
 AnswerType이 YES인지 확인한다.
 YES가 아니면 통과 결과를 반환한다.
 YES이면 질문 객체의 매입불가 사유를 담아 rejected 결과를 반환한다.
+
+---
+
+# 1단계 13일차 - BuyDecisionService JUnit 테스트 구조 설계 및 첫 테스트 구현
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 `BuyDecisionService`의 응답 평가 로직을 JUnit 단위 테스트로 검증하는 것이다.
+
+기존에는 콘솔에서 직접 실행하며 수동 테스트로 확인했다. 이번 단계에서는 `BookConditionQuestion`, `BookConditionResponse` 객체를 직접 생성하고 `BuyDecisionService.evaluateResponse()`를 호출해 결과를 자동으로 검증한다.
+
+---
+
+## 2. 테스트 대상
+
+```text
+BuyDecisionService.evaluateResponse(BookConditionResponse response)

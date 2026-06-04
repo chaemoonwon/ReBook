@@ -6,8 +6,8 @@ public class BookConditionQuestion {
     //매입 불가 사유
     private final String rejectedReason;
 
-    public BookConditionQuestion(String question, String rejectedReason) {
-        this.content = question;
+    public BookConditionQuestion(String content, String rejectedReason) {
+        this.content = content;
         this.rejectedReason = rejectedReason;
     }
 

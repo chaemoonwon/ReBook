@@ -2248,6 +2248,7 @@ BookConditionResponse를 받는다.
 AnswerType이 YES인지 확인한다.
 YES가 아니면 통과 결과를 반환한다.
 YES이면 질문 객체의 매입불가 사유를 담아 rejected 결과를 반환한다.
+```
 
 ---
 
@@ -2265,3 +2266,25 @@ YES이면 질문 객체의 매입불가 사유를 담아 rejected 결과를 반�
 
 ```text
 BuyDecisionService.evaluateResponse(BookConditionResponse response)
+```
+
+---
+
+# 1단계 14일차 - 콘솔 MVP 테스트 범위 확장 및 마무리 점검
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 `AnswerType.fromInput()`에 대한 단위 테스트를 작성하고, 콘솔 MVP가 다음 단계로 넘어갈 준비가 되었는지 점검하는 것이다.
+
+---
+
+## 2. AnswerType 테스트 목적
+
+`AnswerType.fromInput()`은 사용자 입력 문자열을 프로그램 내부에서 사용할 enum 값으로 변환하는 책임을 가진다.
+
+```text
+"1" → YES
+"2" → NO
+"3" → OTHER
+잘못된 입력 → null
+```

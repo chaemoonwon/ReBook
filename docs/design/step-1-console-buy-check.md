@@ -2288,3 +2288,105 @@ BuyDecisionService.evaluateResponse(BookConditionResponse response)
 "3" → OTHER
 잘못된 입력 → null
 ```
+
+---
+
+# 1단계 15일차 - 콘솔 MVP Spring Boot 전환 전 구조 점검
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 콘솔 MVP에서 만든 객체 중 Spring Boot API 전환 후에도 재사용할 수 있는 객체와, 콘솔 전용이라 제거 또는 대체해야 하는 객체를 구분하는 것이다.
+
+또한 API 요청/응답 구조로 전환하기 위해 DTO를 왜 분리해야 하는지, Controller가 기존 Main의 어떤 책임을 가져가는지 정리한다.
+
+---
+
+## 2. Spring Boot에서도 재사용 가능한 객체
+
+Spring Boot에서도 재사용 가능성이 높은 객체는 다음과 같다.
+
+- AnswerType
+- BookConditionQuestion
+- QuestionProvider
+- BuyDecisionService
+
+일부 수정 또는 역할 재검토가 필요한 객체는 다음과 같다.
+
+- BookConditionResponse
+- ResponseEvaluationResult
+- BuyDecisionResult
+
+BookConditionResponse와 BuyDecisionResult는 현재 내부 도메인 흐름에서 사용하는 객체이므로, API 요청/응답 객체로 그대로 사용하기보다는 별도의 DTO를 두는 것이 적절하다.
+
+---
+
+## 3. Spring Boot에서 제외 또는 대체될 객체
+
+Spring Boot API 구조에서는 아래 객체를 그대로 사용하지 않는다.
+
+- InputView
+- OutputView
+- Main
+
+InputView는 콘솔 입력을 담당하고, OutputView는 콘솔 출력을 담당한다. Spring Boot에서는 HTTP Request Body가 입력 역할을 하고, JSON Response가 출력 역할을 한다.
+
+Main은 콘솔 프로그램의 전체 실행 흐름을 조립했지만, Spring Boot에서는 Controller가 API 요청 흐름을 조립한다.
+
+---
+
+## 4. DTO를 분리하는 이유
+
+DTO를 분리하는 이유는 외부 API 요청/응답 형식과 내부 도메인 객체를 분리하기 위해서다.
+
+Request DTO는 외부에서 들어오는 데이터를 API 요청 형식에 맞게 받는다.
+
+Response DTO는 내부 처리 결과를 외부 클라이언트에게 보여주기 좋은 응답 형식으로 변환한다.
+
+도메인 객체를 그대로 외부에 노출하면 API 형식 변경이 내부 도메인 구조에 영향을 줄 수 있고, 내부 필드가 불필요하게 외부에 공개될 수 있다.
+
+따라서 Spring Boot 전환 시에는 BuyCheckRequest, BuyCheckAnswerRequest, BuyCheckResponse 같은 DTO를 별도로 설계하는 것이 적절하다.
+
+---
+
+## 5. Controller가 가져갈 Main의 책임
+
+콘솔 MVP에서 Main은 입력, 질문 목록 조회, 응답 객체 생성, Service 호출, 최종 결과 생성, 출력 연결을 담당했다.
+
+Spring Boot 전환 후 Controller는 이 중 API 요청 흐름을 연결하는 책임을 가져간다.
+
+Controller는 HTTP 요청을 받고, Request DTO를 읽고, Service를 호출하고, Response DTO를 반환한다.
+
+즉, Main이 콘솔 흐름 조립자였다면 Controller는 API 요청 흐름 조립자다.
+
+---
+
+## 6. 테스트 유지 방식
+
+기존 AnswerTypeTest와 BuyDecisionServiceTest는 SpringBootTest로 전환하지 않는다.
+
+이 테스트들은 Spring 컨테이너가 필요 없는 순수 Java 객체 테스트이므로 JUnit 단위 테스트로 유지한다.
+
+추후 Controller 테스트는 WebMvcTest 또는 SpringBootTest를 사용할 수 있다.
+
+---
+
+## 7. 오늘 결정한 기준
+
+- InputView, OutputView, Main은 콘솔 전용 객체다.
+- Spring Boot에서는 Controller가 API 요청 흐름을 조립한다.
+- DTO는 API 요청/응답 형식과 내부 도메인 객체를 분리하기 위해 사용한다.
+- BuyDecisionService는 콘솔이나 웹에 의존하지 않으므로 재사용 가능하다.
+- 기존 Service/Domain 테스트는 JUnit 단위 테스트로 유지한다.
+
+---
+
+## 8. 다음 과제
+
+다음 과제에서는 Spring Boot API 전환을 위한 패키지 구조와 DTO를 설계한다.
+
+예상 설계 대상:
+
+- controller/BuyCheckController
+- dto/request/BuyCheckRequest
+- dto/request/BuyCheckAnswerRequest
+- dto/response/BuyCheckResponse

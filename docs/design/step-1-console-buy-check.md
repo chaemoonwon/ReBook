@@ -2390,3 +2390,127 @@ Controller는 HTTP 요청을 받고, Request DTO를 읽고, Service를 호출하
 - dto/request/BuyCheckRequest
 - dto/request/BuyCheckAnswerRequest
 - dto/response/BuyCheckResponse
+
+---
+
+# 1단계 16일차 - Spring Boot API 전환을 위한 패키지 구조와 DTO 설계
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 콘솔 MVP를 Spring Boot API 구조로 전환하기 위해 필요한 패키지 구조와 DTO를 설계하는 것이다.
+
+콘솔 MVP에서는 InputView, OutputView, Main이 입력과 출력 흐름을 담당했다. Spring Boot API 구조에서는 Controller, Request DTO, Response DTO가 이 흐름을 대체한다.
+
+---
+
+## 2. 새로 필요한 패키지
+
+Spring Boot 전환 후 새로 필요한 패키지는 다음과 같다.
+
+```text
+controller
+dto/request
+dto/response
+```
+
+controller 패키지는 API 요청을 받는 Controller를 둔다.
+
+dto/request 패키지는 외부에서 들어오는 요청 데이터를 담는 DTO를 둔다.
+
+dto/response 패키지는 외부로 반환할 응답 데이터를 담는 DTO를 둔다.
+
+## 3. BuyCheckRequest 설계
+
+BuyCheckRequest는 클라이언트가 서버로 보내는 매입 가능 여부 확인 요청 데이터를 담는 Request DTO다.
+
+필드 후보는 다음과 같다.
+
+private String bookTitle;
+private List<BuyCheckAnswerRequest> answers;
+
+bookTitle은 사용자가 어떤 책에 대해 매입 가능 여부를 확인하는지 나타낸다.
+
+answers는 질문별 답변 목록을 담는다.
+
+## 4. BuyCheckAnswerRequest 설계
+
+BuyCheckAnswerRequest는 질문 하나에 대한 사용자의 답변을 담는 Request DTO다.
+
+필드 후보는 다음과 같다.
+
+private Long questionId;
+private AnswerType answerType;
+
+questionId는 어떤 질문에 대한 답변인지 식별하기 위해 사용한다.
+
+answerType은 사용자의 답변을 YES, NO, OTHER 중 하나로 표현한다.
+
+## 5. questionId를 요청값으로 받는 이유
+
+API 요청에서는 questionContent보다 questionId를 받는 것이 적절하다.
+
+이유는 다음과 같다.
+
+질문 문장이 바뀌어도 API 요청 구조가 유지된다.
+긴 질문 문장을 매번 요청으로 보내지 않아도 된다.
+서버가 questionId를 기준으로 정확한 질문과 매입불가 사유를 찾을 수 있다.
+클라이언트가 임의로 질문 문장을 조작하는 문제를 줄일 수 있다.
+
+## 6. BuyCheckResponse 설계
+
+BuyCheckResponse는 매입 가능 여부 판단 결과를 클라이언트에게 반환하기 위한 Response DTO다.
+
+필드 후보는 다음과 같다.
+
+private boolean buyable;
+private String message;
+private String rejectReason;
+
+buyable은 매입 가능 여부를 나타낸다.
+
+message는 사용자에게 보여줄 결과 메시지를 나타낸다.
+
+rejectReason은 매입불가일 경우 사유를 나타낸다.
+
+## 7. Controller 처리 흐름
+
+Controller는 Request DTO를 받은 뒤 다음 순서로 처리한다.
+
+```text
+1. BuyCheckRequest를 받는다.
+2. Request 안의 answers를 하나씩 확인한다.
+3. questionId로 QuestionProvider에서 BookConditionQuestion을 찾는다.
+4. BookConditionQuestion과 AnswerType을 묶어 BookConditionResponse를 만든다.
+5. BuyDecisionService.evaluateResponse(response)를 호출한다.
+6. rejected = true이면 BuyDecisionResult를 만든다.
+7. 모든 답변을 통과하면 매입 가능 BuyDecisionResult를 만든다.
+8. BuyDecisionResult를 BuyCheckResponse로 변환한다.
+9. BuyCheckResponse를 반환한다.
+```
+## 8. DTO를 Domain 객체로 변환하는 책임
+
+현재 단계에서는 Controller가 DTO를 Domain 객체로 변환해도 된다.
+
+이유는 아직 DTO와 Domain 객체의 변환 로직이 짧고 단순하기 때문이다.
+
+하지만 추후 변환 코드가 길어지거나 여러 Controller에서 반복된다면 별도 Mapper 객체로 분리하는 것이 좋다.
+
+Mapper는 처음부터 무조건 만드는 객체가 아니라, 변환 책임이 커졌을 때 분리하는 객체다.
+
+## 9. 오늘 결정한 기준
+BuyCheckRequest는 외부에서 들어오는 요청 데이터를 담는다.
+BuyCheckResponse는 Service 판단 이후 외부로 반환할 응답 데이터를 담는다.
+questionContent보다 questionId를 요청값으로 받는다.
+Service는 API 요청 DTO를 직접 알지 않도록 한다.
+현재 단계에서는 Controller에서 DTO를 Domain으로 변환한다.
+Mapper는 변환 책임이 커졌을 때 분리한다.
+
+## 10. 다음 과제
+
+다음 과제에서는 questionId 기반 질문 조회 구조를 설계한다.
+
+다음 설계 질문:
+
+BookConditionQuestion에 questionId 필드를 추가해야 할까?
+QuestionProvider는 findById(Long questionId) 같은 메서드를 가져야 할까?
+요청으로 들어온 questionId가 존재하지 않으면 어떻게 처리해야 할까?

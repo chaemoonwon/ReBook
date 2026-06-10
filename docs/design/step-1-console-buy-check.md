@@ -2462,9 +2462,11 @@ BuyCheckResponse는 매입 가능 여부 판단 결과를 클라이언트에게 
 
 필드 후보는 다음과 같다.
 
+```java
 private boolean buyable;
 private String message;
 private String rejectReason;
+```
 
 buyable은 매입 가능 여부를 나타낸다.
 
@@ -2498,12 +2500,13 @@ Controller는 Request DTO를 받은 뒤 다음 순서로 처리한다.
 Mapper는 처음부터 무조건 만드는 객체가 아니라, 변환 책임이 커졌을 때 분리하는 객체다.
 
 ## 9. 오늘 결정한 기준
-BuyCheckRequest는 외부에서 들어오는 요청 데이터를 담는다.
-BuyCheckResponse는 Service 판단 이후 외부로 반환할 응답 데이터를 담는다.
-questionContent보다 questionId를 요청값으로 받는다.
-Service는 API 요청 DTO를 직접 알지 않도록 한다.
-현재 단계에서는 Controller에서 DTO를 Domain으로 변환한다.
-Mapper는 변환 책임이 커졌을 때 분리한다.
+
+- BuyCheckRequest는 외부에서 들어오는 요청 데이터를 담는다.
+- BuyCheckResponse는 Service 판단 이후 외부로 반환할 응답 데이터를 담는다.
+- questionContent보다 questionId를 요청값으로 받는다.
+- Service는 API 요청 DTO를 직접 알지 않도록 한다.
+- 현재 단계에서는 Controller에서 DTO를 Domain으로 변환한다.
+- Mapper는 변환 책임이 커졌을 때 분리한다.
 
 ## 10. 다음 과제
 
@@ -2511,6 +2514,119 @@ Mapper는 변환 책임이 커졌을 때 분리한다.
 
 다음 설계 질문:
 
-BookConditionQuestion에 questionId 필드를 추가해야 할까?
-QuestionProvider는 findById(Long questionId) 같은 메서드를 가져야 할까?
-요청으로 들어온 questionId가 존재하지 않으면 어떻게 처리해야 할까?
+- BookConditionQuestion에 questionId 필드를 추가해야 할까?
+- QuestionProvider는 findById(Long questionId) 같은 메서드를 가져야 할까?
+- 요청으로 들어온 questionId가 존재하지 않으면 어떻게 처리해야 할까?
+
+---
+
+# 1단계 17일차 - questionId 기반 질문 조회 구조 설계
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 Spring Boot API 요청에서 들어오는 questionId를 기준으로 서버가 어떤 BookConditionQuestion을 찾아야 하는지 설계하는 것이다.
+
+이전 과제에서 BuyCheckAnswerRequest는 questionId와 answerType을 가진다고 설계했다. 따라서 오늘은 questionId를 실제 서버 질문 목록과 연결하는 구조를 정리한다.
+
+---
+
+## 2. questionId가 필요한 이유
+
+API 방식에서는 사용자가 질문에 순서대로 답하는 것이 아니라, 답변 목록을 한 번에 보낼 수 있다.
+
+따라서 서버는 각 answer가 어떤 질문에 대한 답변인지 알아야 한다.
+
+questionId는 클라이언트가 보낸 답변과 서버가 가진 BookConditionQuestion을 연결하는 식별자 역할을 한다.
+
+questionId를 통해 서버는 해당 질문의 내용과 매입불가 사유를 찾을 수 있다.
+
+---
+
+## 3. BookConditionQuestion에 id 필드가 필요한 이유
+
+API 요청에는 questionId가 포함된다.
+
+서버가 이 questionId를 기준으로 질문을 찾으려면 BookConditionQuestion도 id를 가지고 있어야 한다.
+
+따라서 BookConditionQuestion은 다음 정보를 함께 가지는 방향이 적절하다.
+
+```java
+private final Long id;
+private final String content;
+private final String rejectReason;
+```
+
+id는 질문 식별자, content는 질문 문장, rejectReason은 해당 질문에 YES로 답했을 때 사용할 매입불가 사유를 의미한다.
+
+## 4. QuestionProvider.findById 설계
+
+QuestionProvider는 질문 목록을 관리하고 제공하는 객체다.
+
+따라서 특정 questionId에 해당하는 BookConditionQuestion을 찾는 책임도 QuestionProvider가 가지는 것이 자연스럽다.
+
+Controller가 직접 질문 목록을 반복하면서 찾으면 Controller가 요청 흐름 연결뿐 아니라 질문 조회 세부 로직까지 알게 된다.
+
+따라서 QuestionProvider에 다음 메서드를 추가하는 방향으로 설계한다.
+
+```java
+public Optional<BookConditionQuestion> findById(Long questionId)
+```
+
+## 5. findById 반환 타입
+
+findById의 반환 타입은 Optional<BookConditionQuestion>을 사용한다.
+
+이유는 요청으로 들어온 questionId에 해당하는 질문이 존재할 수도 있고, 존재하지 않을 수도 있기 때문이다.
+
+null을 반환하면 Controller가 null 체크를 놓쳤을 때 NullPointerException이 발생할 수 있다.
+
+Optional을 사용하면 질문이 없을 수 있다는 사실을 반환 타입에서 명확히 표현할 수 있다.
+
+## 6. 잘못된 questionId 처리 기준
+
+존재하지 않는 questionId가 들어온 경우에는 매입불가로 처리하지 않는다.
+
+매입불가는 책 상태에 대한 판단 결과다.
+
+반면 잘못된 questionId는 사용자가 보낸 API 요청값 문제다.
+
+따라서 잘못된 questionId는 잘못된 요청으로 처리하는 것이 적절하다.
+
+## 7. Controller 처리 흐름
+
+Controller는 다음 흐름으로 처리한다.
+
+```text
+1. BuyCheckRequest를 받는다.
+2. answers를 반복한다.
+3. 각 answer의 questionId로 QuestionProvider.findById(questionId)를 호출한다.
+4. 질문이 없으면 잘못된 요청으로 처리한다.
+5. 질문이 있으면 BookConditionQuestion과 answerType을 묶어 BookConditionResponse를 생성한다.
+6. BuyDecisionService.evaluateResponse(response)를 호출한다.
+7. rejected = true이면 매입불가 BuyDecisionResult를 생성한다.
+8. rejected = false이면 다음 answer로 넘어간다.
+9. 모든 답변이 통과되면 매입 가능 BuyDecisionResult를 생성한다.
+10. BuyDecisionResult를 BuyCheckResponse로 변환한다.
+11. BuyCheckResponse를 반환한다.
+```
+## 8. 오늘 결정한 기준
+
+- API 요청에서는 questionId로 질문을 식별한다.
+- BookConditionQuestion에 id 필드를 추가한다.
+- QuestionProvider는 findById(Long questionId)를 제공한다.
+- findById는 Optional<BookConditionQuestion>을 반환한다.
+- 잘못된 questionId는 매입불가가 아니라 잘못된 요청으로 처리한다.
+- Controller는 questionId로 질문을 찾은 뒤 BookConditionResponse를 만들어 Service를 호출한다.
+
+## 9. 다음 과제
+
+다음 과제에서는 오늘 설계한 내용을 바탕으로 questionId 기반 질문 조회 구조를 구현한다.
+
+다음 구현 대상:
+
+- BookConditionQuestion id 필드 추가
+- BookConditionQuestion 생성자 수정
+- BookConditionQuestion getId() 추가
+- QuestionProvider 질문 목록에 id 부여
+- QuestionProvider.findById(Long questionId) 구현
+- 필요 시 QuestionProvider 테스트 검토

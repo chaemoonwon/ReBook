@@ -2630,3 +2630,78 @@ Controller는 다음 흐름으로 처리한다.
 - QuestionProvider 질문 목록에 id 부여
 - QuestionProvider.findById(Long questionId) 구현
 - 필요 시 QuestionProvider 테스트 검토
+
+---
+
+# 1단계 18일차 - questionId 기반 질문 조회 구조 구현
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 이전에 설계한 questionId 기반 질문 조회 구조를 실제 코드에 반영하는 것이다.
+
+API 요청에서는 각 답변이 questionId를 가진다. 서버는 이 questionId를 기준으로 BookConditionQuestion을 찾아야 한다.
+
+## 2. BookConditionQuestion 구조 변경
+
+BookConditionQuestion은 questionId, content, rejectedReason을 가진다.
+
+questionId는 질문 식별자다.
+content는 질문 문장이다.
+rejectedReason은 YES 응답일 때 사용할 매입불가 사유다.
+
+## 3. QuestionProvider 질문 목록 수정
+
+QuestionProvider의 질문 목록에 1L부터 5L까지 id를 부여했다.
+
+이 id는 API 요청의 questionId와 연결된다.
+
+## 4. QuestionProvider.findById 구현
+
+QuestionProvider에 findById(Long questionId)를 추가했다.
+
+반환 타입은 Optional<BookConditionQuestion>이다.
+
+```java
+public Optional<BookConditionQuestion> findById(Long questionId) {
+    return getQuestions().stream()
+            .filter(question -> Objects.equals(question.getQuestionId(), questionId))
+            .findFirst();
+}
+```
+
+질문이 존재하면 Optional에 BookConditionQuestion이 담긴다.
+질문이 존재하지 않으면 Optional.empty()가 반환된다.
+
+## 5. QuestionProviderTest 작성
+
+QuestionProviderTest에서는 최소 두 가지를 검증한다.
+
+1. 존재하는_id이면_질문을_반환한다
+2. 존재하지_않는_id이면_빈_Optional을_반환한다
+
+첫 번째 테스트에서는 Optional이 존재하는지 확인한 뒤, 반환된 질문의 questionId, content, rejectedReason을 검증한다.
+
+두 번째 테스트에서는 존재하지 않는 id인 999L을 넣었을 때 Optional.empty()가 반환되는지 검증한다.
+
+## 6. 오늘 결정한 기준
+- findById는 Optional<BookConditionQuestion>을 반환한다.
+- Optional.get()은 isPresent() 확인 뒤 사용한다.
+- 존재하지 않는 questionId는 QuestionProvider 단계에서는 Optional.empty()로 표현한다.
+- 잘못된 요청 응답 처리는 이후 Controller 단계에서 처리한다.
+
+## 7. 다음 과제
+
+다음 과제에서는 Spring Boot API Controller 요청 처리 흐름을 설계한다.
+
+다음 설계 대상:
+
+- BuyCheckController
+- BuyCheckRequest 처리
+- answers 반복
+- questionId로 질문 조회
+- Optional.empty() 처리
+- BookConditionResponse 생성
+- BuyDecisionService 호출
+- BuyCheckResponse 반환
+
+---

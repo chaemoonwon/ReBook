@@ -11,7 +11,7 @@ class BuyDecisionServiceTest {
 
     @Test
     public void YES_응답이면_매입불가_결과를_반환한다() {
-        BookConditionQuestion question = new BookConditionQuestion("곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
+        BookConditionQuestion question = new BookConditionQuestion(1L,"곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
         BookConditionResponse response = new BookConditionResponse(question, AnswerType.YES);
         ResponseEvaluationResult result = service.evaluateResponse(response);
 
@@ -22,7 +22,7 @@ class BuyDecisionServiceTest {
 
     @Test
     public void NO_응답이면_매입가능_결과를_반환한다(){
-        BookConditionQuestion question = new BookConditionQuestion("곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
+        BookConditionQuestion question = new BookConditionQuestion(1L, "곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
         BookConditionResponse response = new BookConditionResponse(question, AnswerType.NO);
         ResponseEvaluationResult result = service.evaluateResponse(response);
 
@@ -33,7 +33,7 @@ class BuyDecisionServiceTest {
 
     @Test
     public void OTHER_응답이면_매입가능_결과를_반환한다(){
-        BookConditionQuestion question = new BookConditionQuestion("곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
+        BookConditionQuestion question = new BookConditionQuestion(1L, "곰팡이가 있나요?", "곰팡이가 있어 매입이 어렵습니다.");
         BookConditionResponse response = new BookConditionResponse(question, AnswerType.OTHER);
         ResponseEvaluationResult result = service.evaluateResponse(response);
 

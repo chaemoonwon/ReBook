@@ -2705,3 +2705,117 @@ QuestionProviderTest에서는 최소 두 가지를 검증한다.
 - BuyCheckResponse 반환
 
 ---
+
+# 1단계 19일차 - Spring Boot API Controller 요청 처리 흐름 설계
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 Spring Boot API 전환 과정에서 BuyCheckController가 BuyCheckRequest를 받은 뒤 어떤 순서로 요청을 처리해야 하는지 설계하는 것이다.
+
+지난 단계에서 QuestionProvider.findById(Long questionId)를 구현했으므로, 오늘은 Controller가 이 메서드를 어떻게 활용할지 정리한다.
+
+---
+
+## 2. BuyCheckController의 역할
+
+BuyCheckController는 API 요청 흐름을 연결하는 객체다.
+
+Controller는 HTTP 요청을 받고, Request DTO를 읽고, 필요한 Domain 객체로 변환하고, Service를 호출한 뒤, Response DTO를 반환한다.
+
+Controller는 매입 가능 여부 판단 로직을 직접 가지지 않는다.
+
+---
+
+## 3. BuyCheckRequest 처리 흐름
+
+BuyCheckRequest는 bookTitle과 answers를 가진다.
+
+answers는 BuyCheckAnswerRequest 목록이다.
+
+각 BuyCheckAnswerRequest는 questionId와 answerType을 가진다.
+
+Controller는 answers를 반복하면서 각 answer의 questionId를 이용해 QuestionProvider에서 BookConditionQuestion을 찾는다.
+
+---
+
+## 4. Optional.empty() 처리
+
+QuestionProvider.findById(questionId)가 Optional.empty()를 반환하면, 해당 questionId에 맞는 질문이 없다는 뜻이다.
+
+이 경우 BookConditionResponse를 만들 수 없고, BuyDecisionService도 호출할 수 없다.
+
+따라서 Controller는 이를 잘못된 요청으로 처리해야 한다.
+
+---
+
+## 5. BookConditionResponse 생성
+
+findById 결과에 값이 있으면 Controller는 Optional에서 BookConditionQuestion을 꺼낸다.
+
+그다음 BuyCheckAnswerRequest에서 answerType을 꺼낸다.
+
+Controller는 이 두 값을 묶어 BookConditionResponse를 생성한다.
+
+```text
+BookConditionQuestion + AnswerType
+→ BookConditionResponse
+```
+
+BookConditionResponse는 BuyDecisionService가 평가할 입력값이다.
+
+## 6. BuyDecisionService 호출
+
+Controller는 생성한 BookConditionResponse를 BuyDecisionService.evaluateResponse(response)에 전달한다.
+
+BuyDecisionService는 ResponseEvaluationResult를 반환한다.
+
+rejected = true이면 즉시 매입불가 BuyDecisionResult를 생성한다.
+
+rejected = false이면 다음 answer로 넘어간다.
+
+## 7. 즉시 종료 기준
+
+기존 콘솔 MVP와 동일하게 API에서도 매입불가 즉시 종료 기준을 유지한다.
+
+answers 반복 중 하나라도 rejected = true이면 더 이상 나머지 answer를 평가하지 않고 즉시 매입불가 응답을 반환한다.
+
+모든 answers가 rejected = false이면 매입 가능 응답을 반환한다.
+
+## 8. Controller 처리 순서 (핵심)
+
+1. BuyCheckRequest를 받는다.
+2. answers를 반복한다.
+3. 각 answer에서 questionId와 answerType을 꺼낸다.
+4. QuestionProvider.findById(questionId)를 호출한다.
+5. Optional.empty()이면 잘못된 요청으로 처리한다.
+6. Optional에 값이 있으면 BookConditionQuestion을 꺼낸다.
+7. BookConditionQuestion과 AnswerType을 묶어 BookConditionResponse를 생성한다.
+8. BuyDecisionService.evaluateResponse(response)를 호출한다.
+9. ResponseEvaluationResult를 받는다.
+10. rejected = true이면 매입불가 BuyDecisionResult를 생성한다.
+11. BuyDecisionResult를 BuyCheckResponse로 변환해 반환한다.
+12. rejected = false이면 다음 answer로 넘어간다.
+13. 모든 answers를 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+14. BuyDecisionResult를 BuyCheckResponse로 변환해 반환한다.
+
+## 9. 오늘 결정한 기준
+
+- Controller는 요청 흐름을 연결한다.
+- Controller는 직접 매입불가 조건을 판단하지 않는다.
+- QuestionProvider는 questionId로 BookConditionQuestion을 찾는다.
+- Optional.empty()이면 Service를 호출하지 않는다.
+- BookConditionResponse는 BookConditionQuestion과 AnswerType을 묶어 만든다.
+- BuyDecisionService는 BookConditionResponse를 입력값으로 받는다.
+- rejected = true이면 즉시 매입불가 응답을 반환한다.
+- 모든 answers가 통과하면 매입 가능 응답을 반환한다.
+
+## 10. 다음 과제
+
+다음 과제에서는 Spring Boot API DTO 및 Controller 기본 구조를 구현한다.
+
+구현 대상:
+
+- BuyCheckRequest
+- BuyCheckAnswerRequest
+- BuyCheckResponse
+- BuyCheckController

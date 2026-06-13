@@ -2819,3 +2819,136 @@ answers 반복 중 하나라도 rejected = true이면 더 이상 나머지 answe
 - BuyCheckAnswerRequest
 - BuyCheckResponse
 - BuyCheckController
+
+---
+
+# 1단계 20일차 - Spring Boot API DTO 및 Controller 기본 구조 설계
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 Spring Boot API 전환을 위해 Request DTO, Response DTO, Controller 기본 구조를 설계하는 것이다.
+
+이 단계에서는 전체 매입 가능 여부 판단 로직을 완성하지 않고, API 요청을 받을 수 있는 기본 입구 구조를 준비한다.
+
+---
+
+## 2. DTO 역할 정리
+
+### BuyCheckRequest
+
+BuyCheckRequest는 매입 가능 여부 확인 요청 전체 데이터를 담는 Request DTO다.
+
+필드 후보:
+
+```java
+private String bookTitle;
+private List<BuyCheckAnswerRequest> answers;
+```
+
+### BuyCheckAnswerRequest
+
+BuyCheckAnswerRequest는 질문 하나에 대한 답변 데이터를 담는 Request DTO다.
+
+필드 후보:
+
+```java
+private Long questionId;
+private AnswerType answerType;
+```
+### BuyCheckResponse
+
+BuyCheckResponse는 매입 가능 여부 판단 결과를 외부로 반환하는 Response DTO다.
+
+필드 후보:
+
+```java
+private boolean buyable;
+private String message;
+private String rejectReason;
+```
+
+## 3. 기본 생성자와 getter가 필요한 이유
+
+@RequestBody로 JSON 요청 데이터를 DTO 객체로 변환할 때, Spring/Jackson은 DTO 객체를 생성하고 그 안에 값을 채워 넣는다.
+
+생성자를 하나도 작성하지 않으면 Java가 기본 생성자를 자동으로 만들어준다.
+
+하지만 생성자를 하나라도 직접 작성하면 기본 생성자는 자동 생성되지 않으므로, 필요하다면 직접 작성해야 한다.
+
+Controller에서 DTO 값을 읽으려면 getter가 필요하다.
+
+## 4. Spring MVC 어노테이션 역할
+
+@RequestBody는 HTTP 요청 body의 JSON 데이터를 Java 객체로 변환한다.
+
+@RestController는 해당 클래스가 REST API Controller임을 나타내며, 메서드가 반환한 객체를 JSON 응답으로 변환한다.
+
+@RequestMapping은 Controller의 공통 URL 경로를 지정한다.
+
+@PostMapping은 POST 요청을 처리할 메서드와 URL을 연결한다.
+
+## 5. API URL 설계
+
+매입 가능 여부 확인 API는 다음 URL을 사용한다.
+
+```text
+POST /api/buy-check
+```
+
+이 API는 bookTitle과 answers를 요청 body로 받아 매입 가능 여부를 판단한다.
+
+answers 안에는 questionId와 answerType이 들어 있다.
+
+## 6. Controller 기본 구조
+
+BuyCheckController는 다음 구조를 가진다.
+
+```java
+@RestController
+@RequestMapping("/api/buy-check")
+public class BuyCheckController {
+
+    @PostMapping
+    public BuyCheckResponse checkBuyable(@RequestBody BuyCheckRequest request) {
+        // 다음 단계에서 로직 구현
+    }
+}
+```
+
+## 7. Controller 전체 처리 흐름
+
+추후 Controller는 다음 흐름으로 동작한다.
+
+1. @RequestBody로 BuyCheckRequest를 받는다.
+2. BuyCheckRequest에서 answers를 꺼낸다.
+3. answers를 반복한다.
+4. 각 BuyCheckAnswerRequest에서 questionId와 answerType을 꺼낸다.
+5. QuestionProvider.findById(questionId)를 호출한다.
+6. 질문이 없으면 잘못된 요청으로 처리한다.
+7. 질문이 있으면 BookConditionQuestion과 AnswerType을 묶어 BookConditionResponse를 생성한다.
+8. BuyDecisionService.evaluateResponse(response)를 호출한다.
+9. rejected = true이면 매입불가 BuyDecisionResult를 생성한다.
+10. BuyDecisionResult를 BuyCheckResponse로 변환해 반환한다.
+11. 모든 answers가 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+12. BuyDecisionResult를 BuyCheckResponse로 변환해 반환한다.
+
+## 8. 오늘 결정한 기준
+- DTO는 데이터를 담는 객체다.
+- BuyCheckRequest는 요청 전체 데이터를 담는다.
+- BuyCheckAnswerRequest는 질문 하나에 대한 답변 데이터를 담는다.
+- BuyCheckResponse는 외부 응답 데이터를 담는다.
+- POST /api/buy-check를 매입 가능 여부 확인 API로 사용한다.
+- 오늘은 DTO와 Controller 기본 구조만 구현한다.
+- Controller 내부 판단 로직은 다음 단계에서 구현한다.
+
+## 9. 다음 과제
+
+다음 과제에서는 오늘 설계한 내용을 실제 코드로 구현한다.
+
+구현 대상:
+
+- dto/request/BuyCheckRequest
+- dto/request/BuyCheckAnswerRequest
+- dto/response/BuyCheckResponse
+- controller/BuyCheckController
+

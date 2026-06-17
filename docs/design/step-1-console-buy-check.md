@@ -2952,3 +2952,136 @@ public class BuyCheckController {
 - dto/response/BuyCheckResponse
 - controller/BuyCheckController
 
+---
+
+# 1단계 21일차 - Spring Boot API DTO 및 Controller 기본 구조 구현
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 Spring Boot API 전환을 위해 Request DTO, Response DTO, Controller 기본 구조를 실제 코드로 구현하는 것이다.
+
+이 단계에서는 전체 매입 판단 로직을 완성하지 않고, POST /api/buy-check 요청을 받을 수 있는 API 입구 구조를 준비한다.
+
+---
+
+## 2. 구현한 DTO
+
+### BuyCheckRequest
+
+BuyCheckRequest는 매입 가능 여부 확인 요청 전체 데이터를 담는다.
+
+필드:
+
+```java
+private String bookTitle;
+private List<BuyCheckAnswerRequest> answers;
+```
+
+구성 요소:
+
+```text
+- 기본 생성자
+- getBookTitle()
+- getAnswers()
+```
+
+### BuyCheckAnswerRequest
+
+BuyCheckAnswerRequest는 질문 하나에 대한 답변 데이터를 담는다.
+
+필드:
+
+```java
+private Long questionId;
+private AnswerType answerType;
+```
+
+구성 요소:
+
+```text
+- 기본 생성자
+- getQuestionId()
+- getAnswerType()
+```
+
+### BuyCheckResponse
+
+BuyCheckResponse는 매입 가능 여부 판단 결과를 외부로 반환하는 데이터를 담는다.
+
+필드:
+
+```java
+private boolean buyable;
+private String message;
+private String rejectReason;
+```
+
+구성 요소:
+
+```text
+- 기본 생성자
+- 생성자
+- getter
+- from(BuyDecisionResult result)
+```
+
+## 3. 구현한 Controller
+
+BuyCheckController는 POST /api/buy-check 요청을 받는다.
+
+```java
+@RestController
+@RequestMapping("/api/buy-check")
+public class BuyCheckController {
+
+    @PostMapping
+    public BuyCheckResponse checkBuyable(@RequestBody BuyCheckRequest request) {
+        return new BuyCheckResponse(true, "매입 가능합니다.", "");
+    }
+}
+```
+
+현재는 전체 판단 로직을 연결하지 않고 임시 응답을 반환한다.
+
+## 4. 오늘 구현 범위
+
+오늘 구현한 것:
+
+```text
+- DTO 클래스 생성
+- Controller 클래스 생성
+- POST /api/buy-check 요청 메서드 생성
+- 임시 BuyCheckResponse 반환
+```
+
+아직 구현하지 않은 것:
+
+```text
+- answers 반복 처리
+- QuestionProvider.findById 연결
+- BookConditionResponse 생성
+- BuyDecisionService.evaluateResponse 호출
+- Optional.empty() 처리
+- 실제 매입 가능 여부 판단
+```
+
+## 5. 오늘 결정한 기준
+- DTO는 데이터를 담는다.
+- Controller는 API 요청을 받는 입구 역할을 한다.
+- 오늘은 임시 응답 반환까지만 구현한다.
+- 실제 판단 로직은 다음 과제에서 연결한다.
+
+## 6. 다음 과제
+
+다음 과제에서는 Controller와 Service 연결 흐름을 구현한다.
+
+다음 구현 대상:
+
+- Controller 생성자 주입
+- QuestionProvider 주입
+- BuyDecisionService 주입
+- answers 반복
+- questionId 조회
+- BookConditionResponse 생성
+- BuyDecisionService 호출
+- BuyCheckResponse 반환

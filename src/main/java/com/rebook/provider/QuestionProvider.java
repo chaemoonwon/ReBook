@@ -1,11 +1,13 @@
 package com.rebook.provider;
 
 import com.rebook.domain.BookConditionQuestion;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+@Component
 public class QuestionProvider {
 
     private final List<BookConditionQuestion> questions = List.of

@@ -3085,3 +3085,73 @@ public class BuyCheckController {
 - BookConditionResponse 생성
 - BuyDecisionService 호출
 - BuyCheckResponse 반환
+
+---
+
+# 1단계 22일차 - BuyCheckController와 Service 연결 흐름 구현
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 BuyCheckController가 임시 응답만 반환하던 구조에서 벗어나, 실제 QuestionProvider와 BuyDecisionService를 연결해 매입 가능 여부를 판단하도록 구현하는 것이다.
+
+---
+
+## 2. Controller 의존 객체
+
+BuyCheckController는 다음 객체를 사용한다.
+
+```java
+private final QuestionProvider provider;
+private final BuyDecisionService service;
+```
+
+QuestionProvider는 questionId로 BookConditionQuestion을 찾는 역할을 한다.
+
+BuyDecisionService는 BookConditionResponse를 평가해 rejected 여부를 판단하는 역할을 한다.
+
+## 3. Spring Bean 등록
+
+QuestionProvider는 @Component로 등록한다.
+
+BuyDecisionService는 @Service로 등록한다.
+
+이를 통해 BuyCheckController는 생성자 주입으로 두 객체를 사용할 수 있다.
+
+## 4. Controller 처리 흐름
+
+```text
+1. BuyCheckRequest를 받는다.
+2. request.getAnswers()로 answers를 꺼낸다.
+3. answers를 반복한다.
+4. 각 answer에서 questionId와 answerType을 꺼낸다.
+5. QuestionProvider.findById(questionId)를 호출한다.
+6. Optional.empty()이면 잘못된 요청 응답을 반환한다.
+7. Optional에 값이 있으면 BookConditionQuestion을 꺼낸다.
+8. BookConditionQuestion과 AnswerType을 묶어 BookConditionResponse를 생성한다.
+9. BuyDecisionService.evaluateResponse(response)를 호출한다.
+10. ResponseEvaluationResult를 받는다.
+11. rejected = true이면 매입불가 BuyDecisionResult를 생성한다.
+12. BuyCheckResponse.from(result)로 변환해 즉시 반환한다.
+13. rejected = false이면 다음 answer로 넘어간다.
+14. 모든 answers가 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+15. BuyCheckResponse.from(result)로 변환해 반환한다.
+```
+
+## 5. 오늘 구현한 기준
+
+- Controller는 직접 answerType == YES를 판단하지 않는다.
+- 매입 판단은 BuyDecisionService가 담당한다.
+- Controller는 Service가 반환한 rejected 값을 기준으로 즉시 반환 여부를 판단한다.
+- Optional.empty()이면 Service를 호출하지 않는다.
+- 잘못된 questionId는 임시로 잘못된 요청 응답을 반환한다.
+
+## 6. 다음 과제
+
+다음 과제에서는 잘못된 요청 응답을 더 명확하게 분리하는 방법을 설계한다.
+
+후보:
+
+- ErrorResponse DTO
+- ResponseEntity.badRequest()
+- IllegalArgumentException
+- @ControllerAdvice

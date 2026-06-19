@@ -3155,3 +3155,135 @@ BuyDecisionService는 @Service로 등록한다.
 - ResponseEntity.badRequest()
 - IllegalArgumentException
 - @ControllerAdvice
+
+---
+
+# 1단계 23일차 - BuyCheckController API 응답 개선 및 예외 처리 설계
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 BuyCheckController에서 잘못된 questionId가 들어왔을 때 이를 매입불가 결과가 아니라 API 요청 오류로 분리해 처리하는 방향을 설계하는 것이다.
+
+현재 Controller는 잘못된 questionId를 BuyDecisionResult로 감싸서 반환하고 있다. 하지만 BuyDecisionResult는 책 상태에 따른 매입 가능 여부 판단 결과를 표현하는 객체다.
+
+따라서 잘못된 questionId처럼 API 요청 데이터 자체가 잘못된 경우에는 별도의 ErrorResponse와 HTTP 상태 코드를 사용해 표현하는 것이 더 적절하다.
+
+---
+
+## 2. 잘못된 questionId와 매입불가의 차이
+
+매입불가는 책 상태에 대한 판단 결과다.
+
+예를 들어 곰팡이, 심한 찢어짐, 물 젖음, 페이지 누락 같은 상태가 있으면 책 상태 문제로 매입불가가 된다.
+
+반면 잘못된 questionId는 책 상태 문제가 아니다.
+
+클라이언트가 서버에 존재하지 않는 questionId를 보낸 요청 데이터 문제다.
+
+따라서 잘못된 questionId는 매입불가가 아니라 API 요청 오류로 처리해야 한다.
+
+---
+
+## 3. 기존 방식의 문제
+
+기존 방식은 잘못된 questionId를 다음과 같이 처리했다.
+
+```java
+BuyDecisionResult result = new BuyDecisionResult(false, "", "잘못된 요청입니다.");
+return BuyCheckResponse.from(result);
+```
+
+이 방식은 구현은 단순하지만 의미가 애매하다.
+
+BuyDecisionResult는 매입 판단 결과를 표현하는 객체인데, 여기에 API 요청 오류까지 담으면 buyable=false가 책 상태 문제인지 요청 오류인지 구분하기 어렵다.
+
+## 4. ErrorResponse 설계
+
+ErrorResponse는 API 오류 응답을 담는 객체다.
+
+필드는 다음과 같이 설계한다.
+
+```java
+private String code;
+private String message;
+```
+
+예상 응답은 다음과 같다.
+
+```json
+{
+  "code": "INVALID_QUESTION_ID",
+  "message": "존재하지 않는 질문입니다."
+}
+```
+
+code는 오류 종류를 구분하기 위한 값이고, message는 클라이언트에게 전달할 오류 설명이다.
+
+## 5. ResponseEntity 사용 이유
+
+ResponseEntity는 HTTP 상태 코드와 응답 body를 함께 반환할 수 있게 해준다.
+
+잘못된 questionId가 들어온 경우에는 다음과 같은 구조로 응답할 수 있다.
+
+```java
+return ResponseEntity.badRequest()
+        .body(new ErrorResponse("INVALID_QUESTION_ID", "존재하지 않는 질문입니다."));
+```
+
+이 응답은 다음 두 가지를 함께 표현한다.
+
+```text
+HTTP 상태 코드: 400 Bad Request
+응답 body: ErrorResponse
+```
+
+## 6. HTTP 상태 코드 선택
+
+잘못된 questionId에는 400 Bad Request가 적절하다.
+
+404 Not Found는 보통 요청한 URL이나 특정 자원이 존재하지 않을 때 사용한다.
+
+이번 경우에는 URL인 POST /api/buy-check는 존재한다.
+
+문제는 요청 body 안의 questionId 값이 잘못된 것이다.
+
+따라서 클라이언트가 잘못된 요청 데이터를 보낸 경우이므로 400 Bad Request가 더 적절하다.
+
+## 7. 개선 후 Controller 흐름
+
+```text
+1. BuyCheckRequest를 받는다.
+2. answers를 반복한다.
+3. 각 answer에서 questionId와 answerType을 꺼낸다.
+4. QuestionProvider.findById(questionId)를 호출한다.
+5. Optional.empty()이면 ErrorResponse를 생성한다.
+6. ResponseEntity.badRequest().body(errorResponse)를 반환한다.
+7. Optional에 값이 있으면 BookConditionQuestion을 꺼낸다.
+8. BookConditionQuestion과 answerType을 묶어 BookConditionResponse를 생성한다.
+9. BuyDecisionService.evaluateResponse(response)를 호출한다.
+10. ResponseEvaluationResult의 rejected 값을 확인한다.
+11. rejected = true이면 매입불가 BuyDecisionResult를 생성한다.
+12. BuyCheckResponse로 변환해 반환한다.
+13. 모든 answers가 통과하면 매입 가능 BuyDecisionResult를 생성한다.
+14. BuyCheckResponse로 변환해 반환한다.
+```
+
+## 8. 오늘 결정한 기준
+
+- 잘못된 questionId는 매입불가가 아니라 API 요청 오류다.
+- BuyDecisionResult는 책 상태 판단 결과만 표현한다.
+- API 요청 오류는 ErrorResponse로 표현한다.
+- 잘못된 questionId에는 400 Bad Request를 사용한다.
+- 지금 단계에서는 ErrorResponse + ResponseEntity를 사용한다.
+- 추후 예외 종류가 많아지면 @ControllerAdvice로 공통 예외 처리를 분리한다.
+
+## 9. 다음 과제
+
+다음 과제에서는 오늘 설계한 내용을 실제 코드로 구현한다.
+
+구현 대상:
+
+- ErrorResponse 클래스 생성
+- BuyCheckController 반환 타입 수정
+- Optional.empty() 처리 부분 수정
+- ResponseEntity.badRequest().body(errorResponse) 적용

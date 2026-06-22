@@ -9,6 +9,11 @@ public class BuyCheckAnswerRequest {
     public BuyCheckAnswerRequest() {
     }
 
+    public BuyCheckAnswerRequest(Long questionId, AnswerType answerType) {
+        this.questionId = questionId;
+        this.answerType = answerType;
+    }
+
     public Long getQuestionId() {
         return questionId;
     }

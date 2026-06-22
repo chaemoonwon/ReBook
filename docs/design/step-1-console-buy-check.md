@@ -3287,3 +3287,109 @@ HTTP 상태 코드: 400 Bad Request
 - BuyCheckController 반환 타입 수정
 - Optional.empty() 처리 부분 수정
 - ResponseEntity.badRequest().body(errorResponse) 적용
+
+---
+
+# 1단계 24일차 - ErrorResponse와 ResponseEntity 적용 구현 및 Controller 테스트
+
+## 1. 오늘 과제 목적
+
+오늘 과제의 목적은 잘못된 questionId를 매입불가 결과가 아니라 API 요청 오류로 분리하고, Controller 테스트로 정상 응답과 오류 응답을 검증하는 것이다.
+
+---
+
+## 2. 응답 구조 분리
+
+### BuyCheckResponse
+
+BuyCheckResponse는 매입 가능 여부 판단 결과를 외부로 반환하는 응답 DTO다.
+
+사용 상황:
+
+- 모든 답변이 통과한 경우
+- 중간에 매입불가 조건이 발견된 경우
+
+### ErrorResponse
+
+ErrorResponse는 API 요청 오류를 외부로 반환하는 응답 DTO다.
+
+사용 상황:
+
+- 존재하지 않는 questionId가 들어온 경우
+
+필드:
+
+```java
+private String code;
+private String message;
+```
+
+## 3. Controller 테스트 대상
+
+BuyCheckControllerTest에서는 다음 3가지 케이스를 검증한다.
+
+```text
+1. 모든 답변이 NO이면 매입 가능 응답을 반환한다.
+2. 답변 중 YES가 있으면 매입불가 응답을 반환한다.
+3. 존재하지 않는 questionId이면 400 응답을 반환한다.
+```
+
+## 4. 테스트 기대 결과
+
+### 모든 답변 NO
+
+```text
+HTTP 상태 코드: 200 OK
+응답 DTO: BuyCheckResponse
+buyable: true
+message: 매입 가능합니다.
+rejectReason: 빈 문자열
+```
+
+### 중간 답변 YES
+
+```text
+HTTP 상태 코드: 200 OK
+응답 DTO: BuyCheckResponse
+buyable: false
+message: 매입 불가능 합니다.
+rejectReason: 해당 질문의 매입불가 사유
+```
+
+### 존재하지 않는 questionId
+
+```text
+HTTP 상태 코드: 400 Bad Request
+응답 DTO: ErrorResponse
+code: INVALID_QUESTION_ID
+message: 존재하지 않는 ID입니다.
+```
+
+## 5. 오늘 결정한 기준
+
+- 매입 가능/불가능은 BuyCheckResponse로 반환한다.
+- 잘못된 questionId는 ErrorResponse로 반환한다.
+- 정상 판단 결과는 200 OK로 반환한다.
+- 잘못된 요청 데이터는 400 Bad Request로 반환한다.
+- Controller 테스트는 MockMvc로 HTTP 요청/응답을 검증한다.
+- QuestionProvider와 BuyDecisionService는 MockBean으로 대체한다.
+
+## 6. 테스트 결과
+
+```text
+[x] 모든 답변 NO 테스트 통과
+[x] 중간 답변 YES 테스트 통과
+[x] 존재하지 않는 questionId 테스트 통과
+```
+
+총 3개 Controller 테스트가 모두 통과했다.
+
+## 7. 다음 과제
+
+다음 과제에서는 ErrorResponse 생성 책임과 예외 처리 구조를 더 개선할지 설계한다.
+
+후보:
+
+- ErrorCode 상수 또는 enum 분리
+- @ControllerAdvice 도입
+- 공통 예외 처리 구조 설계

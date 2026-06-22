@@ -9,6 +9,11 @@ public class BuyCheckRequest {
     public BuyCheckRequest() {
     }
 
+    public BuyCheckRequest(String bookTitle, List<BuyCheckAnswerRequest> answers) {
+        this.bookTitle = bookTitle;
+        this.answers = answers;
+    }
+
     public String getBookTitle() {
         return bookTitle;
     }

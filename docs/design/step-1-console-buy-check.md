@@ -3393,3 +3393,206 @@ message: 존재하지 않는 ID입니다.
 - ErrorCode 상수 또는 enum 분리
 - @ControllerAdvice 도입
 - 공통 예외 처리 구조 설계
+
+# 1단계 25일차 - BuyCheck API 오류 처리 구조 개선 설계
+
+## 현재 오류 처리 구조
+
+현재 BuyCheck API에서는 잘못된 questionId가 전달되었을 경우 Controller에서 직접 ErrorResponse를 생성하여 반환하고 있다.
+
+현재 구조는 다음과 같다.
+
+```text
+Controller
+→ QuestionProvider.findById()
+→ Optional.empty()
+→ ErrorResponse 생성
+→ 400 Bad Request 반환
+```
+
+예시:
+
+```java
+if (question.isEmpty()) {
+    ErrorResponse errorResponse =
+            new ErrorResponse("INVALID_QUESTION_ID",
+                    "존재하지 않는 질문입니다.");
+
+    return ResponseEntity.badRequest()
+            .body(errorResponse);
+}
+```
+
+---
+
+## 현재 구조의 장점
+
+현재 ReBook 단계에서는 오류 종류가 많지 않다.
+
+따라서
+
+* 구현이 단순하다.
+* 흐름을 이해하기 쉽다.
+* 파일 수가 적다.
+* 학습 난이도가 낮다.
+
+라는 장점이 있다.
+
+---
+
+## 현재 구조의 단점
+
+Controller가
+
+* 요청 처리
+* 오류 응답 생성
+
+두 가지 책임을 동시에 가지게 된다.
+
+프로젝트 규모가 커질수록
+
+* 중복 코드 증가
+* Controller 복잡도 증가
+* 예외 처리 관리 어려움
+
+문제가 발생할 수 있다.
+
+---
+
+## 검토한 대안
+
+### 1. 현재 방식 유지
+
+```text
+Controller
+→ ErrorResponse 직접 생성
+```
+
+장점
+
+* 가장 단순함
+
+단점
+
+* 오류 종류 증가 시 관리 어려움
+
+---
+
+### 2. ErrorCode 분리
+
+```text
+ErrorCode enum
+→ ErrorResponse에서 사용
+```
+
+예시
+
+```java
+INVALID_QUESTION_ID
+INVALID_REQUEST
+```
+
+장점
+
+* 문자열 오타 방지
+* 오류 코드 중앙 관리
+* 현재 단계에 적절한 복잡도
+
+---
+
+### 3. Custom Exception + @ControllerAdvice
+
+구조
+
+```text
+Controller
+→ Custom Exception 발생
+
+@ControllerAdvice
+→ Exception 처리
+
+ErrorResponse 생성
+→ HTTP 응답 반환
+```
+
+장점
+
+* Controller 책임 감소
+* 예외 처리 일원화
+
+단점
+
+* 현재 ReBook 단계에서는 구조가 과함
+
+---
+
+## 최종 결정
+
+현재 단계에서는
+
+```text
+ErrorCode enum 분리
+```
+
+만 적용한다.
+
+Custom Exception과 @ControllerAdvice는 도입하지 않는다.
+
+---
+
+## 결정 이유
+
+현재 오류 종류는
+
+```text
+존재하지 않는 questionId
+```
+
+정도만 존재한다.
+
+따라서
+
+```text
+ErrorCode
+```
+
+만 도입해도 충분한 개선 효과를 얻을 수 있다.
+
+반면
+
+```text
+Custom Exception
+@ControllerAdvice
+```
+
+까지 도입하면
+
+학습해야 할 개념과 구조가 증가하고
+
+현재 프로젝트 규모에 비해 과한 설계가 될 수 있다.
+
+---
+
+## 향후 확장 방향
+
+향후 아래와 같은 오류가 증가하면
+
+```text
+잘못된 요청 형식
+필수값 누락
+존재하지 않는 질문
+잘못된 AnswerType
+기타 비즈니스 예외
+```
+
+다음 구조로 확장한다.
+
+```text
+Custom Exception
++
+@ControllerAdvice
++
+ErrorCode
+```
+
+구조를 사용하여 예외 처리를 일원화한다.

@@ -3701,3 +3701,100 @@ ErrorResponse
 ```
 
 이때 Controller는 예외를 발생시키고, @ControllerAdvice가 예외를 잡아 ErrorResponse로 변환하는 방식으로 개선한다.
+
+---
+
+# 1단계 27일차 - BuyCheck API 요청 검증 구조 설계
+
+## 목적
+
+Service에서 비즈니스 로직을 수행하기 전에 API 요청이 올바른지 먼저 검증한다.
+
+잘못된 요청은 Service까지 전달하지 않고 Controller 단계에서 처리한다.
+
+---
+
+## Request 검증 대상
+
+### BuyCheckRequest
+
+필수값
+
+* bookTitle
+* answers
+
+추가 조건
+
+* answers는 비어 있으면 안 된다.
+
+### BuyCheckAnswerRequest
+
+필수값
+
+* questionId
+* answerType
+
+---
+
+## 잘못된 요청 기준
+
+다음 요청은 잘못된 요청으로 판단한다.
+
+* bookTitle = null
+* bookTitle = ""
+* answers = []
+* questionId = null
+* answerType = null
+
+응답
+
+```text
+400 Bad Request
+```
+
+---
+
+## 설계 결정
+
+Request 검증을 먼저 수행한 뒤 Service를 호출한다.
+
+```text
+Request
+
+↓
+
+Request 검증
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Response
+```
+
+---
+
+## 결정 이유
+
+잘못된 요청이 Service와 Domain으로 전달되는 것을 방지한다.
+
+비즈니스 로직은 정상적인 요청만 처리하도록 책임을 분리한다.
+
+---
+
+## 향후 구현 방향
+
+다음 단계에서 Spring Validation을 이용하여 Request 검증을 구현한다.
+
+검토 대상
+
+* @NotNull
+* @NotBlank
+* @NotEmpty
+* @Valid

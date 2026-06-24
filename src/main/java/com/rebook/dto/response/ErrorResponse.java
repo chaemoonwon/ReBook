@@ -1,12 +1,15 @@
 package com.rebook.dto.response;
 
-public class ErrorResponse {
-    private String code;
-    private String message;
+import com.rebook.domain.ErrorCode;
 
-    public ErrorResponse(String code, String message) {
-        this.code = code;
-        this.message = message;
+public class ErrorResponse {
+    private final String code;
+//    private final String code;
+    private final String message;
+
+    public ErrorResponse(ErrorCode code) {
+        this.code = code.getCode();
+        this.message = code.getMessage();
     }
 
     public String getCode() {

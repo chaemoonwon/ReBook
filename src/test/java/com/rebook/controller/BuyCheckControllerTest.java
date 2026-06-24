@@ -18,10 +18,10 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static com.rebook.domain.ErrorCode.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -107,7 +107,7 @@ class BuyCheckControllerTest {
     public void 존재하지_않는_questionId이면_400응답을_반환한다() throws Exception {
 
         //given
-        ErrorResponse errorResponse = new ErrorResponse("INVALID_QUESTION_ID", "존재하지 않는 ID입니다.");
+        ErrorResponse errorResponse = new ErrorResponse(INVALID_QUESTION_ID);
 
         BuyCheckRequest request = new BuyCheckRequest("자바의 정석", List.of(
                 new BuyCheckAnswerRequest(999L, AnswerType.NO)

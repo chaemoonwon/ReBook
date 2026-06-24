@@ -3596,3 +3596,108 @@ ErrorCode
 ```
 
 구조를 사용하여 예외 처리를 일원화한다.
+
+---
+
+# 1단계 26일차 - ErrorCode 분리 구현
+
+## 목적
+
+BuyCheck API에서 오류 코드를 문자열로 직접 작성하던 구조를 개선한다.
+
+기존에는 Controller에서 ErrorResponse를 만들 때 오류 코드 문자열과 메시지를 직접 작성했다.
+
+이 방식은 다음 문제가 있다.
+
+- 문자열 오타 가능성
+- 오류 코드 중복 가능성
+- 오류 코드와 메시지 관리 위치 분산
+- Controller 책임 증가
+
+---
+
+## 개선 방향
+
+ErrorCode enum을 도입한다.
+
+ErrorCode는 오류 코드와 기본 메시지를 함께 관리한다.
+
+```text
+ErrorCode
+→ code
+→ message
+```
+
+ErrorResponse는 ErrorCode에서 code와 message를 꺼내 API 응답 body 형태로 변환한다.
+
+```text
+ErrorCode
+→ ErrorResponse
+→ JSON 응답
+```
+
+## 책임 분리
+
+### ErrorCode
+
+오류 코드와 메시지를 관리한다.
+
+예:
+
+```text
+INVALID_QUESTION_ID
+존재하지 않는 ID입니다.
+```
+
+### ErrorResponse
+
+ErrorCode를 받아 클라이언트에게 반환할 응답 body 형태로 변환한다.
+
+응답 필드:
+
+```text
+code
+message
+```
+
+### BuyCheckController
+
+오류 상황을 판단하고, 적절한 ErrorCode를 사용해 ErrorResponse를 반환한다.
+
+Controller는 오류 코드 문자열과 메시지를 직접 작성하지 않는다.
+
+## 최종 결정
+
+현재 단계에서는 ErrorCode enum만 분리한다.
+
+Custom Exception과 @ControllerAdvice는 아직 도입하지 않는다.
+
+## 결정 이유
+
+현재 ReBook의 오류 종류는 많지 않다.
+
+따라서 ErrorCode만 분리해도 다음 효과를 얻을 수 있다.
+
+- 오류 코드 중앙 관리
+- 메시지 중앙 관리
+- 문자열 오타 방지
+- 재사용성 향상
+- Controller 책임 감소
+
+반면 Custom Exception과 @ControllerAdvice까지 도입하면 현재 단계에서는 구조가 과해질 수 있다.
+
+## 향후 확장 방향
+
+오류 종류가 많아지면 다음 구조로 확장한다.
+
+```text
+Custom Exception
++
+@ControllerAdvice
++
+ErrorCode
++
+ErrorResponse
+```
+
+이때 Controller는 예외를 발생시키고, @ControllerAdvice가 예외를 잡아 ErrorResponse로 변환하는 방식으로 개선한다.

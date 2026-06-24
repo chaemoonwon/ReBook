@@ -1,9 +1,6 @@
 package com.rebook.controller;
 
-import com.rebook.domain.BookConditionQuestion;
-import com.rebook.domain.BookConditionResponse;
-import com.rebook.domain.BuyDecisionResult;
-import com.rebook.domain.ResponseEvaluationResult;
+import com.rebook.domain.*;
 import com.rebook.dto.request.BuyCheckAnswerRequest;
 import com.rebook.dto.request.BuyCheckRequest;
 import com.rebook.dto.response.BuyCheckResponse;
@@ -19,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Optional;
+
+import static com.rebook.domain.ErrorCode.*;
 
 @RestController
 @RequestMapping("/api/buy-check")
@@ -39,7 +38,9 @@ public class BuyCheckController {
         for (BuyCheckAnswerRequest answer : answers) {
             Optional<BookConditionQuestion> optionalQuestion = provider.findById(answer.getQuestionId());
             if (optionalQuestion.isEmpty()) {
-                ErrorResponse errorResponse = new ErrorResponse("INVALID_QUESTION_ID", "존재하지 않는 ID입니다.");
+                ErrorResponse errorResponse = new ErrorResponse(INVALID_QUESTION_ID);
+//                ErrorCode code = errorResponse.getCode();
+//                String message = code.getMessage();
                 return ResponseEntity.badRequest().body(errorResponse);
 //                BuyDecisionResult result = new BuyDecisionResult(false, "", "잘못된 요청입니다.");
 //                return BuyCheckResponse.from(result);

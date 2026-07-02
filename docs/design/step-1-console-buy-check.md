@@ -3704,97 +3704,70 @@ ErrorResponse
 
 ---
 
-# 1단계 27일차 - BuyCheck API 요청 검증 구조 설계
+# 1단계 27일차 - BuyCheck API 요청 검증 구현 및 테스트
 
-## 목적
+## 1. 오늘 과제 목적
 
-Service에서 비즈니스 로직을 수행하기 전에 API 요청이 올바른지 먼저 검증한다.
-
-잘못된 요청은 Service까지 전달하지 않고 Controller 단계에서 처리한다.
+이번 과제의 목적은 BuyCheck API 요청 데이터가 올바른지 Controller 진입 단계에서 검증하고,
+잘못된 요청이 BuyDecisionService까지 전달되지 않도록 하는 것이다.
 
 ---
 
-## Request 검증 대상
+## 2. 검증 대상
 
 ### BuyCheckRequest
 
-필수값
-
-* bookTitle
-* answers
-
-추가 조건
-
-* answers는 비어 있으면 안 된다.
+- bookTitle
+- answers
 
 ### BuyCheckAnswerRequest
 
-필수값
-
-* questionId
-* answerType
+- questionId
+- answerType
 
 ---
 
-## 잘못된 요청 기준
+## 3. 구현 내용
 
-다음 요청은 잘못된 요청으로 판단한다.
+### BuyCheckRequest
 
-* bookTitle = null
-* bookTitle = ""
-* answers = []
-* questionId = null
-* answerType = null
+- bookTitle에 @NotBlank를 적용했다.
+- answers에 @NotEmpty를 적용했다.
+- answers 내부 객체 검증을 위해 @Valid를 적용했다.
 
-응답
+### BuyCheckAnswerRequest
 
-```text
-400 Bad Request
-```
+- questionId에 @NotNull을 적용했다.
+- answerType에 @NotNull을 적용했다.
 
 ---
 
-## 설계 결정
+## 4. 테스트 결과
 
-Request 검증을 먼저 수행한 뒤 Service를 호출한다.
+잘못된 요청 request이면 400 Bad Request를 반환하는 테스트를 추가했다.
 
-```text
-Request
+현재 테스트에서는 Validation 실패 응답 body까지 검증하지 않고,
+400 상태 코드가 반환되는지만 검증한다.
 
-↓
-
-Request 검증
-
-↓
-
-Controller
-
-↓
-
-Service
-
-↓
-
-Response
-```
+이유는 아직 Validation 실패를 ErrorResponse(INVALID_REQUEST)로 변환하는
+전역 예외 처리 구조를 도입하지 않았기 때문이다.
 
 ---
 
-## 결정 이유
+## 5. 결정한 기준
 
-잘못된 요청이 Service와 Domain으로 전달되는 것을 방지한다.
-
-비즈니스 로직은 정상적인 요청만 처리하도록 책임을 분리한다.
+- bookTitle은 null, 빈 문자열, 공백 문자열을 막아야 한다.
+- answers는 null이거나 빈 리스트이면 안 된다.
+- answers 리스트 내부의 BuyCheckAnswerRequest까지 검증하려면 @Valid가 필요하다.
+- questionId와 answerType은 필수값이므로 @NotNull을 사용한다.
+- 잘못된 요청은 Service까지 전달하지 않는다.
+- Validation 실패 응답 body 통일은 다음 단계에서 다룬다.
 
 ---
 
-## 향후 구현 방향
+## 6. 다음 과제
 
-다음 단계에서 Spring Validation을 이용하여 Request 검증을 구현한다.
+다음 과제는 1단계 28일차 - Validation 실패 응답 구조 개선 설계다.
 
-검토 대상
-
-* @NotNull
-* @NotBlank
-* @NotEmpty
-* @Valid
+다음 과제에서는 Validation 실패 시 발생하는 예외를 어떻게 처리할지,
+그리고 ErrorResponse(INVALID_REQUEST) 형식으로 응답을 통일할지 검토한다.

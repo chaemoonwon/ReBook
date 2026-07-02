@@ -1,9 +1,14 @@
 package com.rebook.dto.request;
 
 import com.rebook.domain.AnswerType;
+import jakarta.validation.constraints.NotNull;
 
 public class BuyCheckAnswerRequest {
+
+    @NotNull
     private Long questionId;
+
+    @NotNull
     private AnswerType answerType;
 
     public BuyCheckAnswerRequest() {

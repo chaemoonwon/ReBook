@@ -124,4 +124,23 @@ class BuyCheckControllerTest {
                 .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
                 .andReturn();
     }
+
+    @Test
+    public void 잘못된_요청_request이면_400응답을_반환한다() throws Exception {
+
+
+        BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
+                "책 제목",
+                List.of()
+        );
+
+
+
+        mockMvc.perform(post("/api/buy-check")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(buyCheckRequest)))
+                .andExpect(status().isBadRequest());
+
+
+    }
 }

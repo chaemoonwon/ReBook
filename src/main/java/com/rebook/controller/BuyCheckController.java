@@ -7,12 +7,12 @@ import com.rebook.dto.response.BuyCheckResponse;
 import com.rebook.dto.response.ErrorResponse;
 import com.rebook.provider.QuestionProvider;
 import com.rebook.service.BuyDecisionService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,7 +33,7 @@ public class BuyCheckController {
     }
 
     @PostMapping
-    public ResponseEntity<?> checkBuyable(@RequestBody BuyCheckRequest request) {
+    public ResponseEntity<?> checkBuyable(@Valid @RequestBody BuyCheckRequest request) {
         List<BuyCheckAnswerRequest> answers = request.getAnswers();
         for (BuyCheckAnswerRequest answer : answers) {
             Optional<BookConditionQuestion> optionalQuestion = provider.findById(answer.getQuestionId());

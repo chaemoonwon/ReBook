@@ -3771,3 +3771,141 @@ ErrorResponse
 
 다음 과제에서는 Validation 실패 시 발생하는 예외를 어떻게 처리할지,
 그리고 ErrorResponse(INVALID_REQUEST) 형식으로 응답을 통일할지 검토한다.
+
+---
+
+# 1단계 28일차 - Validation 실패 응답 구조 개선 구현 및 테스트
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 BuyCheck API 요청 검증 실패 시 Spring 기본 오류 응답을 그대로 사용하지 않고,
+ReBook에서 정의한 `ErrorResponse(INVALID_REQUEST)` 형식으로 응답을 통일하는 것이다.
+
+---
+
+## 2. 문제 상황
+
+`@NotBlank`, `@NotEmpty`, `@NotNull`, `@Valid` 등의 Validation이 실패하면
+Controller 메서드 내부로 들어오기 전에 Spring Validation 예외가 발생한다.
+
+따라서 `BuyCheckController` 안에서 직접 `ErrorResponse(INVALID_REQUEST)`를 만들어 반환하기 어렵다.
+
+### 기존 흐름
+
+```text
+잘못된 Request
+→ Bean Validation 실패
+→ Controller 메서드 실행 전 예외 발생
+→ Spring 기본 오류 응답 반환
+```
+
+### 개선 흐름
+
+```text
+잘못된 Request
+→ Bean Validation 실패
+→ MethodArgumentNotValidException 발생
+→ ErrorControllerAdvice에서 예외 처리
+→ ErrorResponse(INVALID_REQUEST) 반환
+→ 400 Bad Request 응답
+```
+
+---
+
+## 3. 구현 내용
+
+### ErrorControllerAdvice 추가
+
+`com.rebook.advice` 패키지에 `ErrorControllerAdvice`를 추가했다.
+
+`ErrorControllerAdvice`의 역할은 다음과 같다.
+
+- Validation 실패 예외를 처리한다.
+- `MethodArgumentNotValidException`을 잡는다.
+- `ErrorResponse(INVALID_REQUEST)`를 반환한다.
+- HTTP 상태 코드는 `400 Bad Request`로 반환한다.
+
+### @RestControllerAdvice 사용
+
+처음에는 `@ControllerAdvice`를 사용했지만,
+응답 객체를 JSON body로 반환하기 위해 `@RestControllerAdvice`로 변경했다.
+
+`@RestControllerAdvice`는 예외 처리 메서드가 반환하는 객체를 HTTP 응답 body로 직렬화해준다.
+
+---
+
+## 4. 테스트 내용
+
+`BuyCheckControllerTest`에 잘못된 Request 검증 테스트를 보완했다.
+
+### 테스트 시나리오
+
+```text
+answers가 빈 리스트인 요청을 보낸다.
+→ Bean Validation 실패
+→ ErrorControllerAdvice가 예외 처리
+→ 400 Bad Request 반환
+→ code = INVALID_REQUEST
+→ message = 잘못된 요청 입니다.
+```
+
+### 검증 항목
+
+- HTTP Status: `400 Bad Request`
+- 응답 code: `INVALID_REQUEST`
+- 응답 message: `잘못된 요청 입니다.`
+
+---
+
+## 5. 결정한 설계 기준
+
+- Request DTO Validation 실패는 Controller 내부에서 직접 처리하지 않는다.
+- Validation 실패는 Controller 실행 전에 발생하므로 전역 예외 처리 구조에서 처리한다.
+- `MethodArgumentNotValidException`은 `ErrorControllerAdvice`에서 처리한다.
+- Validation 실패 응답은 `ErrorResponse(INVALID_REQUEST)` 형식으로 통일한다.
+- 예외 처리 응답을 JSON body로 반환하기 위해 `@RestControllerAdvice`를 사용한다.
+- 존재하지 않는 questionId 오류와 Validation 실패 오류는 처리 위치가 다르다.
+
+---
+
+## 6. 현재 상태
+
+현재 BuyCheck API 오류 응답 흐름은 다음과 같다.
+
+### 1. 존재하지 않는 questionId
+
+```text
+Controller 내부에서 처리
+→ ErrorResponse(INVALID_QUESTION_ID)
+→ 400 Bad Request
+```
+
+### 2. Request DTO Validation 실패
+
+```text
+Controller 실행 전 예외 발생
+→ ErrorControllerAdvice에서 처리
+→ ErrorResponse(INVALID_REQUEST)
+→ 400 Bad Request
+```
+
+---
+
+## 7. 다음 과제
+
+다음 과제에서는 Validation 실패 케이스를 더 세분화해서 테스트한다.
+
+### 예상 다음 과제
+
+```text
+1단계 29일차 - Validation 실패 케이스별 테스트 보강
+```
+
+### 다음 과제 후보
+
+- `bookTitle`이 빈 문자열인 경우
+- `bookTitle`이 공백 문자열인 경우
+- `answers`가 빈 리스트인 경우
+- `answers` 내부 `questionId`가 `null`인 경우
+- `answers` 내부 `answerType`이 `null`인 경우
+- 각 요청이 `INVALID_REQUEST`로 응답되는지 확인

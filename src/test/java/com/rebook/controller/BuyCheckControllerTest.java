@@ -128,6 +128,7 @@ class BuyCheckControllerTest {
     @Test
     public void 잘못된_요청_request이면_400응답을_반환한다() throws Exception {
 
+        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
 
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "책 제목",
@@ -135,11 +136,13 @@ class BuyCheckControllerTest {
         );
 
 
-
         mockMvc.perform(post("/api/buy-check")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(buyCheckRequest)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(errorResponse.getCode()))
+                .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
+                .andReturn();
 
 
     }

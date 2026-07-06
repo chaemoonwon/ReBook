@@ -3909,3 +3909,255 @@ Controller 실행 전 예외 발생
 - `answers` 내부 `questionId`가 `null`인 경우
 - `answers` 내부 `answerType`이 `null`인 경우
 - 각 요청이 `INVALID_REQUEST`로 응답되는지 확인
+
+---
+
+# 1단계 29일차 - Validation 실패 케이스별 테스트 보강
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 BuyCheck API 요청 검증 실패 케이스를 세분화해서 테스트하고,
+잘못된 요청이 어떤 형태로 들어와도 ReBook의 공통 오류 응답 형식인
+`ErrorResponse(INVALID_REQUEST)`로 일관되게 처리되는지 확인하는 것이다.
+
+이전 단계에서는 Validation 실패 시 `MethodArgumentNotValidException`을
+`ErrorControllerAdvice`에서 처리하여 `INVALID_REQUEST` 응답으로 변환하는 구조를 만들었다.
+
+이번 단계에서는 그 구조가 다양한 잘못된 요청에서도 동일하게 동작하는지 테스트로 검증했다.
+
+---
+
+## 2. 테스트 대상
+
+이번 과제에서 검증한 Validation 실패 케이스는 다음과 같다.
+
+```text
+1. bookTitle이 빈 문자열인 경우
+2. bookTitle이 공백 문자열인 경우
+3. answers가 빈 리스트인 경우
+4. answers 내부 questionId가 null인 경우
+5. answers 내부 answerType이 null인 경우
+```
+
+각 케이스는 모두 잘못된 API 요청이므로,
+`400 Bad Request`와 `INVALID_REQUEST` 응답을 반환해야 한다.
+
+---
+
+## 3. 테스트 내용
+
+### 3-1. bookTitle이 빈 문자열인 경우
+
+```text
+bookTitle = ""
+```
+
+책 제목은 필수값이므로 빈 문자열이면 잘못된 요청이다.
+
+기대 결과:
+
+```text
+HTTP Status: 400 Bad Request
+code: INVALID_REQUEST
+message: 잘못된 요청 입니다.
+```
+
+---
+
+### 3-2. bookTitle이 공백 문자열인 경우
+
+```text
+bookTitle = "        "
+```
+
+공백 문자열은 실제 의미 있는 책 제목이 아니므로 잘못된 요청이다.
+
+`bookTitle`에는 `@NotBlank`를 적용했기 때문에
+빈 문자열뿐 아니라 공백 문자열도 검증 실패로 처리된다.
+
+기대 결과:
+
+```text
+HTTP Status: 400 Bad Request
+code: INVALID_REQUEST
+message: 잘못된 요청 입니다.
+```
+
+---
+
+### 3-3. answers가 빈 리스트인 경우
+
+```text
+answers = []
+```
+
+매입 가능 여부를 판단하려면 최소 1개 이상의 답변이 필요하다.
+
+`answers`에는 `@NotEmpty`를 적용했기 때문에
+빈 리스트는 검증 실패로 처리된다.
+
+기대 결과:
+
+```text
+HTTP Status: 400 Bad Request
+code: INVALID_REQUEST
+message: 잘못된 요청 입니다.
+```
+
+---
+
+### 3-4. answers 내부 questionId가 null인 경우
+
+```text
+questionId = null
+```
+
+`answers` 리스트 자체는 존재하지만,
+각 답변 객체 안의 `questionId`가 없으면 어떤 질문에 대한 답변인지 알 수 없다.
+
+`BuyCheckAnswerRequest.questionId`에는 `@NotNull`이 적용되어 있으므로
+`questionId = null`은 검증 실패로 처리된다.
+
+이 검증이 동작하려면 `BuyCheckRequest.answers`에 `@Valid`가 필요하다.
+
+기대 결과:
+
+```text
+HTTP Status: 400 Bad Request
+code: INVALID_REQUEST
+message: 잘못된 요청 입니다.
+```
+
+---
+
+### 3-5. answers 내부 answerType이 null인 경우
+
+```text
+answerType = null
+```
+
+`answerType`이 없으면 사용자가 어떤 답변을 했는지 알 수 없다.
+
+`BuyCheckAnswerRequest.answerType`에는 `@NotNull`이 적용되어 있으므로
+`answerType = null`은 검증 실패로 처리된다.
+
+기대 결과:
+
+```text
+HTTP Status: 400 Bad Request
+code: INVALID_REQUEST
+message: 잘못된 요청 입니다.
+```
+
+---
+
+## 4. 테스트 결과
+
+전체 테스트를 실행했고, 모든 테스트가 통과했다.
+
+확인된 내용은 다음과 같다.
+
+```text
+- bookTitle이 빈 문자열이면 INVALID_REQUEST를 반환한다.
+- bookTitle이 공백 문자열이면 INVALID_REQUEST를 반환한다.
+- answers가 빈 리스트이면 INVALID_REQUEST를 반환한다.
+- answers 내부 questionId가 null이면 INVALID_REQUEST를 반환한다.
+- answers 내부 answerType이 null이면 INVALID_REQUEST를 반환한다.
+- 기존 정상 요청 테스트도 계속 통과한다.
+- 기존 매입불가 응답 테스트도 계속 통과한다.
+- 기존 존재하지 않는 questionId 테스트도 계속 통과한다.
+```
+
+---
+
+## 5. 결정한 설계 기준
+
+- `bookTitle`은 실제 의미 있는 문자열이어야 한다.
+- `bookTitle`이 빈 문자열이거나 공백 문자열이면 잘못된 요청이다.
+- `answers`는 null이거나 빈 리스트이면 안 된다.
+- `answers` 리스트 자체 검증과 리스트 내부 객체 검증은 다르다.
+- 리스트 내부 객체까지 검증하려면 `answers` 필드에 `@Valid`가 필요하다.
+- `questionId`와 `answerType`은 필수값이므로 null이면 안 된다.
+- Validation 실패는 `ErrorControllerAdvice`에서 `INVALID_REQUEST` 응답으로 변환한다.
+- 잘못된 요청은 `BuyDecisionService`까지 전달하지 않는다.
+
+---
+
+## 6. 현재 BuyCheck API 검증 흐름
+
+```text
+Client Request
+→ BuyCheckRequest 바인딩
+→ Bean Validation 실행
+→ 검증 실패 시 MethodArgumentNotValidException 발생
+→ ErrorControllerAdvice에서 예외 처리
+→ ErrorResponse(INVALID_REQUEST) 반환
+→ 400 Bad Request
+```
+
+정상 요청인 경우에는 기존 흐름대로 처리된다.
+
+```text
+Client Request
+→ BuyCheckRequest
+→ answers 반복
+→ questionId로 BookConditionQuestion 조회
+→ BookConditionResponse 생성
+→ BuyDecisionService 평가
+→ BuyCheckResponse 반환
+```
+
+---
+
+## 7. 현재 상태
+
+현재 BuyCheck API는 아래 오류 상황을 구분해서 처리한다.
+
+### 1. Request DTO Validation 실패
+
+```text
+예:
+- bookTitle 없음
+- answers 비어 있음
+- questionId 없음
+- answerType 없음
+
+처리:
+ErrorControllerAdvice
+→ ErrorResponse(INVALID_REQUEST)
+→ 400 Bad Request
+```
+
+### 2. 존재하지 않는 questionId
+
+```text
+예:
+questionId = 999
+
+처리:
+BuyCheckController 내부에서 QuestionProvider.findById() 결과 확인
+→ ErrorResponse(INVALID_QUESTION_ID)
+→ 400 Bad Request
+```
+
+---
+
+## 8. 다음 과제
+
+다음 과제에서는 현재까지 구현한 Request Validation과 ErrorResponse 구조를 점검하고,
+Controller 테스트의 중복을 줄일 수 있는지 검토한다.
+
+### 예상 다음 과제
+
+```text
+1단계 30일차 - BuyCheckController 테스트 구조 리팩터링 후보 점검
+```
+
+### 다음 과제 후보
+
+- Validation 실패 테스트 중복 구조 점검
+- `INVALID_REQUEST` 검증 반복 코드 분리 여부 검토
+- 테스트 메서드명 정리
+- 사용하지 않는 import 제거
+- `ErrorControllerAdvice` 메서드명 개선 검토
+- Controller 테스트에서 어디까지 검증해야 하는지 정리

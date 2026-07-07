@@ -4161,3 +4161,172 @@ Controller 테스트의 중복을 줄일 수 있는지 검토한다.
 - 사용하지 않는 import 제거
 - `ErrorControllerAdvice` 메서드명 개선 검토
 - Controller 테스트에서 어디까지 검증해야 하는지 정리
+
+---
+
+# 1단계 30일차 - BuyCheckController 테스트 구조 리팩터링 후보 점검
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 `BuyCheckControllerTest`에 추가된 Validation 실패 테스트들을 점검하고,
+테스트 코드의 가독성과 중복 구조를 개선할 수 있는지 확인하는 것이다.
+
+이전 단계에서는 다양한 Validation 실패 케이스를 테스트했다.
+
+```text
+- bookTitle이 빈 문자열인 경우
+- bookTitle이 공백 문자열인 경우
+- answers가 빈 리스트인 경우
+- answers 내부 questionId가 null인 경우
+- answers 내부 answerType이 null인 경우
+```
+
+이번 단계에서는 위 테스트들이 많아지면서 반복되는 검증 코드가 생겼기 때문에,
+어떤 부분을 helper 메서드로 분리할지, 어떤 부분은 각 테스트 안에 유지할지 판단했다.
+
+---
+
+## 2. 점검한 내용
+
+이번 과제에서는 아래 항목을 중심으로 테스트 코드를 점검했다.
+
+```text
+1. 테스트 메서드명이 충분히 구체적인가?
+2. Validation 실패 테스트들이 중복 코드를 가지고 있는가?
+3. ErrorResponse(INVALID_REQUEST) 검증 코드가 반복되고 있는가?
+4. MockMvc 요청 코드가 반복되고 있는가?
+5. helper 메서드로 분리해도 테스트 의도가 유지되는가?
+6. Controller 테스트가 HTTP 요청/응답 흐름 중심으로 작성되어 있는가?
+```
+
+---
+
+## 3. 결정한 리팩터링 기준
+
+테스트 코드에서 중복이 있다고 해서 항상 바로 메서드로 분리하는 것은 적절하지 않다.
+
+테스트 코드에서는 중복 제거보다 테스트 의도가 명확하게 드러나는 것이 더 중요할 수 있다.
+
+따라서 이번 과제에서는 아래 기준을 적용했다.
+
+```text
+1. 실패 원인을 보여주는 요청 데이터 생성 부분은 각 테스트 안에 유지한다.
+2. 반복되는 INVALID_REQUEST 응답 검증 코드는 helper 메서드로 분리한다.
+3. 테스트 메서드명은 넓게 작성하지 않고, 실패 원인과 기대 결과가 드러나도록 작성한다.
+4. Controller 테스트는 Service 내부 로직보다 HTTP 요청/응답 흐름을 중심으로 검증한다.
+```
+
+---
+
+## 4. 구현 내용
+
+### 4-1. 테스트 메서드명 개선
+
+기존의 넓은 테스트명은 더 구체적인 이름으로 변경했다.
+
+기존 이름:
+
+```text
+잘못된_요청_request이면_400응답을_반환한다
+```
+
+변경 후:
+
+```text
+answers가_빈_리스트이면_INVALID_REQUEST를_반환한다
+```
+
+이렇게 변경한 이유는 테스트 실패 시 어떤 요청 조건에서 실패했는지 더 명확하게 알기 위해서다.
+
+---
+
+### 4-2. INVALID_REQUEST 검증 helper 메서드 분리
+
+Validation 실패 테스트에서 반복되던 아래 검증 흐름을 helper 메서드로 분리했다.
+
+```text
+POST /api/buy-check 요청
+→ 400 Bad Request 검증
+→ code = INVALID_REQUEST 검증
+→ message = 잘못된 요청 입니다. 검증
+```
+
+분리한 helper 메서드의 역할은 다음과 같다.
+
+```text
+assertInvalidRequest(BuyCheckRequest request)
+
+역할:
+- 잘못된 BuyCheckRequest를 API에 요청한다.
+- 400 Bad Request를 검증한다.
+- INVALID_REQUEST code를 검증한다.
+- INVALID_REQUEST message를 검증한다.
+```
+
+---
+
+## 5. 현재 테스트 구조
+
+현재 `BuyCheckControllerTest`는 아래 흐름을 검증한다.
+
+```text
+1. 답변 중 YES가 있으면 매입불가 응답을 반환한다.
+2. 모든 답변이 NO이면 매입가능 응답을 반환한다.
+3. 존재하지 않는 questionId이면 INVALID_QUESTION_ID와 400 응답을 반환한다.
+4. answers가 빈 리스트이면 INVALID_REQUEST를 반환한다.
+5. bookTitle이 빈 문자열이면 INVALID_REQUEST를 반환한다.
+6. bookTitle이 공백 문자열이면 INVALID_REQUEST를 반환한다.
+7. answers 내부 questionId가 null이면 INVALID_REQUEST를 반환한다.
+8. answers 내부 answerType이 null이면 INVALID_REQUEST를 반환한다.
+```
+
+---
+
+## 6. 테스트 결과
+
+전체 테스트를 실행했고, 테스트가 정상 통과했다.
+
+확인된 내용은 다음과 같다.
+
+```text
+- 기존 정상 요청 테스트가 계속 통과한다.
+- 기존 매입불가 요청 테스트가 계속 통과한다.
+- 존재하지 않는 questionId 테스트가 계속 통과한다.
+- Validation 실패 케이스들이 모두 INVALID_REQUEST 응답을 반환한다.
+- helper 메서드로 분리한 이후에도 테스트 검증 의도가 유지된다.
+```
+
+---
+
+## 7. 결정한 설계 기준
+
+- 테스트 메서드명은 실패 원인과 기대 결과가 드러나도록 작성한다.
+- Validation 실패 케이스는 각각 실패 원인이 다르므로 테스트를 분리한다.
+- 반복되는 응답 검증은 helper 메서드로 분리할 수 있다.
+- 단, 잘못된 요청 데이터를 만드는 부분은 각 테스트 안에 남겨 테스트 의도를 명확히 한다.
+- Controller 테스트는 HTTP 요청/응답 흐름을 중심으로 검증한다.
+- Service 내부 판단 로직은 Service 테스트에서 다루는 것이 적절하다.
+
+---
+
+## 8. 다음 과제
+
+다음 과제에서는 현재까지 구현한 Request Validation과 ErrorResponse 구조를 마무리 점검하고,
+다음 기능으로 넘어가기 전에 Spring API 전환 단계의 현재 상태를 정리한다.
+
+### 예상 다음 과제
+
+```text
+1단계 31일차 - Request Validation 단계 마무리 점검
+```
+
+### 다음 과제 후보
+
+```text
+- BuyCheckRequest 검증 구조 최종 점검
+- BuyCheckAnswerRequest 검증 구조 최종 점검
+- ErrorControllerAdvice 역할 점검
+- INVALID_REQUEST / INVALID_QUESTION_ID 처리 흐름 비교
+- Controller 테스트 범위 점검
+- 다음 단계로 넘어갈 준비 여부 확인
+```

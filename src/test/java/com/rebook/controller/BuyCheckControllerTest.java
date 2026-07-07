@@ -46,7 +46,7 @@ class BuyCheckControllerTest {
 
 
     @Test
-    public void 답변_중_YES가_있으면_매입불가_응답을_반환한다() throws Exception {
+    void 답변_중_YES가_있으면_매입불가_응답을_반환한다() throws Exception {
 
         BuyCheckRequest request = new BuyCheckRequest("자바의 정석", List.of(
                 new BuyCheckAnswerRequest(1L, AnswerType.NO),
@@ -74,7 +74,7 @@ class BuyCheckControllerTest {
     }
 
     @Test
-    public void 모든_답변이_NO이면_매입가능_응답을_반환한다() throws Exception {
+    void 모든_답변이_NO이면_매입가능_응답을_반환한다() throws Exception {
         BuyCheckRequest request = new BuyCheckRequest("자바의 정석", List.of(
                 new BuyCheckAnswerRequest(1L, AnswerType.NO),
                 new BuyCheckAnswerRequest(2L, AnswerType.NO)
@@ -103,7 +103,7 @@ class BuyCheckControllerTest {
 
 
     @Test
-    public void 존재하지_않는_questionId이면_400응답을_반환한다() throws Exception {
+    void 존재하지_않는_questionId이면_400응답을_반환한다() throws Exception {
 
         //given
         ErrorResponse errorResponse = new ErrorResponse(INVALID_QUESTION_ID);
@@ -125,93 +125,64 @@ class BuyCheckControllerTest {
     }
 
     @Test
-    public void answers가_빈_리스트이면_INVALID_REQUEST를_반환한다() throws Exception {
-
-        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
-
+    void answers가_빈_리스트이면_INVALID_REQUEST를_반환한다() throws Exception {
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "책 제목",
                 List.of()
         );
 
-
-        mockMvc.perform(post("/api/buy-check")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(buyCheckRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(errorResponse.getCode()))
-                .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
-                .andReturn();
+        assertInvalidRequest(buyCheckRequest);
 
 
     }
+
     @Test
     void bookTitle이_빈_문자열이면_INVALID_REQUEST를_반환한다() throws Exception {
-        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
-
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "",
                 List.of(new BuyCheckAnswerRequest(1L, AnswerType.YES))
         );
 
+        assertInvalidRequest(buyCheckRequest);
 
-        mockMvc.perform(post("/api/buy-check")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(buyCheckRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(errorResponse.getCode()))
-                .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
-                .andReturn();
     }
 
     @Test
     void bookTitle이_공백_문자열이면_INVALID_REQUEST를_반환한다() throws Exception {
-        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
 
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "        ",
                 List.of(new BuyCheckAnswerRequest(1L, AnswerType.YES))
         );
 
-
-        mockMvc.perform(post("/api/buy-check")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(buyCheckRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(errorResponse.getCode()))
-                .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
-                .andReturn();
+        assertInvalidRequest(buyCheckRequest);
     }
 
     @Test
     void answers_내부_questionId가_null이면_INVALID_REQUEST를_반환한다() throws Exception {
-        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
 
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "자바의 정석",
                 List.of(new BuyCheckAnswerRequest(null, AnswerType.YES))
         );
 
-
-        mockMvc.perform(post("/api/buy-check")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(buyCheckRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(errorResponse.getCode()))
-                .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
-                .andReturn();
+        assertInvalidRequest(buyCheckRequest);
     }
 
     @Test
     void answers_내부_answerType이_null이면_INVALID_REQUEST를_반환한다() throws Exception {
-        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
-
         BuyCheckRequest buyCheckRequest = new BuyCheckRequest(
                 "자바의 정석",
                 List.of(new BuyCheckAnswerRequest(1L, null))
         );
 
 
+        assertInvalidRequest(buyCheckRequest);
+    }
+
+    private void assertInvalidRequest(BuyCheckRequest buyCheckRequest) throws Exception {
+        ErrorResponse errorResponse = new ErrorResponse(INVALID_REQUEST);
+
         mockMvc.perform(post("/api/buy-check")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(buyCheckRequest)))
@@ -220,5 +191,4 @@ class BuyCheckControllerTest {
                 .andExpect(jsonPath("$.message").value(errorResponse.getMessage()))
                 .andReturn();
     }
-
 }

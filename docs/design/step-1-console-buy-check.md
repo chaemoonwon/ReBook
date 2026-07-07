@@ -4330,3 +4330,46 @@ assertInvalidRequest(BuyCheckRequest request)
 - Controller 테스트 범위 점검
 - 다음 단계로 넘어갈 준비 여부 확인
 ```
+
+---
+
+# 1단계 31일차 - Request Validation 단계 마무리 점검
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 BuyCheck API의 Request Validation 단계에서 구현한 내용을 최종 점검하고,
+다음 단계로 넘어가기 전에 검증 구조, 오류 응답 구조, Controller 테스트 구조가 적절한지 확인하는 것이다.
+
+---
+
+## 2. 점검한 내용
+
+- `BuyCheckRequest` 검증 구조를 점검했다.
+- `BuyCheckAnswerRequest` 검증 구조를 점검했다.
+- `@Valid`, `@NotBlank`, `@NotEmpty`, `@NotNull` 사용 위치를 확인했다.
+- `ErrorControllerAdvice`가 Validation 실패 예외를 정상적으로 처리하는지 확인했다.
+- `INVALID_REQUEST`와 `INVALID_QUESTION_ID`의 처리 위치를 구분했다.
+- `BuyCheckControllerTest`의 구조를 점검했다.
+
+---
+
+## 3. 결정한 기준
+
+- `BuyCheckRequest`는 요청 전체 구조를 검증한다.
+- `BuyCheckAnswerRequest`는 답변 하나의 필수값을 검증한다.
+- `@Valid`는 `answers` 내부 객체 검증을 전달하기 위해 사용한다.
+- Validation 실패는 `ErrorControllerAdvice`에서 `INVALID_REQUEST`로 처리한다.
+- 존재하지 않는 `questionId`는 Controller 내부에서 `INVALID_QUESTION_ID`로 처리한다.
+- Controller 테스트는 HTTP 요청/응답 흐름 중심으로 검증한다.
+
+---
+
+## 4. 테스트 결과
+
+전체 테스트를 실행했고 정상 통과했다.
+
+---
+
+## 5. 다음 과제
+
+다음 과제는 `1단계 32일차 - BuyCheck API 구조 리팩터링 후보 점검`이다.

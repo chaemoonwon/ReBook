@@ -4373,3 +4373,89 @@ assertInvalidRequest(BuyCheckRequest request)
 ## 5. 다음 과제
 
 다음 과제는 `1단계 32일차 - BuyCheck API 구조 리팩터링 후보 점검`이다.
+
+---
+
+# 1단계 32일차 - BuyCheck API 구조 리팩터링 후보 점검
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 `BuyCheckController`의 현재 구조를 점검하고,
+지금 바로 리팩터링할 부분과 다음 단계로 미룰 부분을 구분하는 것이다.
+
+현재 Controller는 BuyCheck API 요청을 받아 질문 조회, 응답 객체 생성, Service 호출, 최종 응답 반환 흐름을 연결하고 있다.
+
+---
+
+## 2. 현재 BuyCheckController 흐름
+
+현재 `BuyCheckController`의 흐름은 다음과 같다.
+
+```text
+Request 수신
+→ BuyCheckRequest 검증
+→ answers 조회
+→ answers 반복
+→ questionId로 BookConditionQuestion 조회
+→ 존재하지 않는 questionId이면 INVALID_QUESTION_ID 반환
+→ BookConditionResponse 생성
+→ BuyDecisionService.evaluateResponse() 호출
+→ rejected이면 매입불가 응답 반환
+→ 모든 답변을 통과하면 매입가능 응답 반환
+```
+
+---
+
+## 3. 점검한 내용
+
+이번 과제에서는 아래 내용을 점검했다.
+
+- `BuyCheckController`가 너무 많은 책임을 가지고 있지는 않은지 확인했다.
+- Controller에서 `answers`를 반복하고 `questionId`를 조회하는 구조가 현재 단계에서 적절한지 검토했다.
+- Request DTO를 Domain 객체로 변환하는 책임을 지금 Controller가 가져도 되는지 검토했다.
+- Mapper를 지금 도입할 필요가 있는지 판단했다.
+- `BuyDecisionService`가 비즈니스 판단 책임에 집중하고 있는지 확인했다.
+- 현재 바로 수정할 부분과 다음 단계로 미룰 부분을 구분했다.
+
+---
+
+## 4. 결정한 기준
+
+현재 단계에서는 `BuyCheckController` 구조를 유지한다.
+
+결정한 기준은 다음과 같다.
+
+- Controller는 HTTP 요청을 받고 전체 흐름을 연결하는 책임을 가진다.
+- Request DTO 검증은 `@Valid`와 DTO Validation으로 처리한다.
+- 존재하지 않는 `questionId`는 Controller 내부에서 `QuestionProvider.findById()` 결과를 확인한 뒤 처리한다.
+- Request DTO에서 Domain 객체로 변환하는 로직은 아직 단순하므로 Controller에서 처리해도 괜찮다.
+- `BuyDecisionService`는 `BookConditionResponse` 하나를 평가하는 비즈니스 판단 책임만 가진다.
+- Mapper는 아직 도입하지 않는다.
+- 변환 로직이 길어지거나 반복되면 Mapper 도입을 다시 검토한다.
+
+---
+
+## 5. 지금 바로 수정하지 않는 항목
+
+아래 항목은 현재 단계에서 바로 수정하지 않고 다음 단계 이후에 다시 검토한다.
+
+- Mapper 도입
+- Controller 흐름 일부를 별도 객체로 분리
+- `INVALID_QUESTION_ID` 처리를 Advice 구조로 이동
+- `BuyDecisionResult` 생성 로직 분리
+- `BuyCheckResponse` 생성 흐름 추가 정리
+
+---
+
+## 6. 테스트 결과
+
+전체 테스트를 실행했고 정상 통과했다.
+
+---
+
+## 7. 다음 과제
+
+다음 과제는 `1단계 33일차 - BuyCheck API 구조 마무리 및 다음 단계 준비`이다.
+
+다음 과제에서는 Spring API 전환 단계에서 지금까지 구현한 흐름을 정리하고,
+다음 기능 단계로 넘어가기 전에 현재 API 구조가 충분히 안정적인지 최종 점검한다.

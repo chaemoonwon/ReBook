@@ -10,8 +10,6 @@ import com.rebook.service.BuyDecisionService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,11 +37,7 @@ public class BuyCheckController {
             Optional<BookConditionQuestion> optionalQuestion = provider.findById(answer.getQuestionId());
             if (optionalQuestion.isEmpty()) {
                 ErrorResponse errorResponse = new ErrorResponse(INVALID_QUESTION_ID);
-//                ErrorCode code = errorResponse.getCode();
-//                String message = code.getMessage();
                 return ResponseEntity.badRequest().body(errorResponse);
-//                BuyDecisionResult result = new BuyDecisionResult(false, "", "잘못된 요청입니다.");
-//                return BuyCheckResponse.from(result);
             }
             BookConditionQuestion question = optionalQuestion.get();
             BookConditionResponse response = new BookConditionResponse(question, answer.getAnswerType());

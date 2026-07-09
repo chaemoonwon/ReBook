@@ -4459,3 +4459,83 @@ Request 수신
 
 다음 과제에서는 Spring API 전환 단계에서 지금까지 구현한 흐름을 정리하고,
 다음 기능 단계로 넘어가기 전에 현재 API 구조가 충분히 안정적인지 최종 점검한다.
+
+---
+
+# 1단계 33일차 - BuyCheck API 구조 마무리 및 다음 단계 준비
+
+## 1. 오늘 과제 목적
+
+이번 과제의 목적은 지금까지 구현한 BuyCheck API 구조를 최종 점검하고,
+다음 단계로 넘어가기 전에 Controller, DTO, Service, Advice의 책임이 적절히 분리되어 있는지 확인하는 것이다.
+
+---
+
+## 2. 현재 BuyCheck API 흐름
+
+현재 BuyCheck API의 전체 흐름은 다음과 같다.
+
+```text
+BuyCheckRequest 요청 수신
+→ Request DTO Validation 실행
+→ Validation 실패 시 ErrorControllerAdvice에서 INVALID_REQUEST 응답 반환
+→ Validation 통과 시 Controller 메서드 실행
+→ answers 반복
+→ questionId로 BookConditionQuestion 조회
+→ 존재하지 않는 questionId이면 INVALID_QUESTION_ID 응답 반환
+→ BookConditionResponse 생성
+→ BuyDecisionService.evaluateResponse() 호출
+→ 매입불가이면 BuyCheckResponse 반환
+→ 모든 답변을 통과하면 매입 가능 BuyCheckResponse 반환
+```
+
+---
+
+## 3. 책임 분리 점검
+
+현재 구조의 책임은 다음과 같이 구분된다.
+
+```text
+Controller
+- HTTP 요청을 받는다.
+- 정상 요청 흐름을 연결한다.
+- questionId 조회 결과에 따라 응답을 분기한다.
+- Service를 호출하고 Response를 반환한다.
+
+DTO
+- API 요청/응답 데이터를 표현한다.
+- Request DTO는 Validation 규칙을 가진다.
+
+Service
+- 매입 가능 여부 판단 로직을 담당한다.
+
+Advice
+- Validation 실패 예외를 공통 오류 응답으로 변환한다.
+```
+
+---
+
+## 4. 결정한 기준
+
+- 현재 BuyCheckController 구조는 유지한다.
+- Mapper는 아직 도입하지 않는다.
+- Request DTO에서 Domain 객체로 변환하는 로직은 현재 단계에서 Controller가 처리해도 괜찮다.
+- BuyDecisionService는 매입 가능 여부 판단 책임만 가진다.
+- Validation 실패는 ErrorControllerAdvice에서 INVALID_REQUEST로 처리한다.
+- 존재하지 않는 questionId는 Controller 내부에서 INVALID_QUESTION_ID로 처리한다.
+- 다음 단계로 넘어가기 전에 추가 리팩터링은 필요하지 않다.
+
+---
+
+## 5. 테스트 결과
+
+전체 테스트를 실행했고 정상 통과했다.
+
+---
+
+## 6. 다음 과제
+
+다음 과제는 `1단계 34일차 - 다음 기능 단계 진입 전 학습 범위 결정`이다.
+
+다음 과제에서는 Spring API 기본 흐름을 마무리한 뒤,
+다음으로 JPA/DB 단계로 넘어갈지, 현재 API 테스트를 더 보강할지 판단한다.
